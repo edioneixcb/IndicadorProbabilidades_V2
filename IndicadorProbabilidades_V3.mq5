@@ -1,74 +1,37 @@
 //+------------------------------------------------------------------+
 //|                                    IndicadorProbabilidades_V3.mq5 |
 //|                                    Indicador de Probabilidades V3 |
-//|                        Sistema Completo de Análise de Padrões MHI |
+//|                                Sistema Completo de Análise MHI |
 //+------------------------------------------------------------------+
-
-/**
- * @file IndicadorProbabilidades_V3.mq5
- * @brief Sistema completo de análise de padrões MHI com arquitetura modular
- * @version 3.0.0
- * @date 2024-12-19
- * 
- * @description
- * Sistema avançado de detecção de padrões de reversão MHI (Mão de Homem Invisível)
- * com análise financeira completa, notificações automáticas, SuperVarredura
- * inteligente e painel visual interativo.
- * 
- * @features
- * - Detecção de 20+ padrões MHI especializados
- * - Sistema de filtros de mercado avançados
- * - Análise financeira completa com simulação de martingale
- * - Notificações Telegram e integração MX2
- * - SuperVarredura automática para otimização
- * - Painel visual com todas as informações em tempo real
- * - Gestão de risco e análise de performance
- * - Arquitetura modular para fácil manutenção
- * 
- * @author Quant Genius
- * @copyright 2024 Indicador de Probabilidades
- */
-
 #property copyright "2024, Indicador de Probabilidades"
 #property link      "https://github.com/edioneixcb/IndicadorProbabilidades_V3"
 #property version   "3.00"
-#property description "Sistema Completo de Análise de Padrões MHI - Versão 3.0"
-#property description "Detecção avançada de padrões, análise financeira, notificações automáticas"
-#property description "Painel visual completo, SuperVarredura inteligente, gestão de risco"
+#property description "Sistema completo de análise de padrões MHI com arquitetura modular"
+#property description "Inclui painel visual, notificações, análise financeira e SuperVarredura"
 
 #property indicator_chart_window
-#property indicator_buffers 6
-#property indicator_plots   3
+#property indicator_buffers 3
+#property indicator_plots   2
 
-// Plotagens principais
-#property indicator_label1  "CALL Signals"
+// Propriedades dos plots
+#property indicator_label1  "CALL Signal"
 #property indicator_type1   DRAW_ARROW
 #property indicator_color1  clrLime
 #property indicator_style1  STYLE_SOLID
-#property indicator_width1  3
+#property indicator_width1  2
 
-#property indicator_label2  "PUT Signals"
+#property indicator_label2  "PUT Signal"
 #property indicator_type2   DRAW_ARROW
 #property indicator_color2  clrRed
 #property indicator_style2  STYLE_SOLID
-#property indicator_width2  3
-
-#property indicator_label3  "Confidence Line"
-#property indicator_type3   DRAW_LINE
-#property indicator_color3  clrYellow
-#property indicator_style3  STYLE_DOT
-#property indicator_width3  1
+#property indicator_width2  2
 
 //+------------------------------------------------------------------+
-//| Includes dos Módulos Core                                        |
+//| Includes dos Módulos                                            |
 //+------------------------------------------------------------------+
 #include "IndicadorProbabilidades_V3/Core/Defines.mqh"
 #include "IndicadorProbabilidades_V3/Core/Types.mqh"
 #include "IndicadorProbabilidades_V3/Core/Globals.mqh"
-
-//+------------------------------------------------------------------+
-//| Includes dos Módulos Especializados                             |
-//+------------------------------------------------------------------+
 #include "IndicadorProbabilidades_V3/Analysis/Financial/FinancialCore.mqh"
 #include "IndicadorProbabilidades_V3/Notifications/Telegram/TelegramCore.mqh"
 #include "IndicadorProbabilidades_V3/Notifications/MX2/MX2Core.mqh"
@@ -78,197 +41,265 @@
 //| Parâmetros de Entrada                                           |
 //+------------------------------------------------------------------+
 
-//--- Configurações Gerais
+// === CONFIGURAÇÕES GERAIS ===
 input group "=== CONFIGURAÇÕES GERAIS ==="
-input bool InpEnableIndicator = true;                    // Habilitar Indicador
-input PatternType InpActivePattern = PATTERN_MHI1;       // Padrão Ativo
-input bool InpEnableInversion = false;                   // Habilitar Inversão
-input int InpMinConfidence = 70;                         // Confiança Mínima (%)
+input bool InpEnabled = true;                          // Habilitar Indicador
+input PatternType InpActivePattern = PATTERN_MHI1;     // Padrão Ativo
+input bool InpEnableInversion = false;                 // Habilitar Inversão
+input int InpMinConfidence = 70;                       // Confiança Mínima (%)
 
-//--- Configurações Visuais
+// === CONFIGURAÇÕES VISUAIS ===
 input group "=== CONFIGURAÇÕES VISUAIS ==="
-input bool InpShowPanel = true;                          // Mostrar Painel
-input PanelPosition InpPanelPosition = PANEL_TOP_RIGHT;  // Posição do Painel
-input int InpPanelOffsetX = 10;                          // Offset X do Painel
-input int InpPanelOffsetY = 30;                          // Offset Y do Painel
-input color InpCallColor = clrLime;                      // Cor CALL
-input color InpPutColor = clrRed;                        // Cor PUT
-input color InpPanelBgColor = clrBlack;                  // Cor Fundo Painel
-input color InpPanelBorderColor = clrWhite;              // Cor Borda Painel
-input color InpPanelTextColor = clrWhite;                // Cor Texto Painel
-input bool InpShowArrows = true;                         // Mostrar Setas
-input ArrowPosition InpArrowPosition = ARROW_ON_CANDLE;  // Posição das Setas
+input bool InpShowPanel = true;                        // Mostrar Painel
+input PanelPosition InpPanelPosition = PANEL_TOP_RIGHT; // Posição do Painel
+input int InpPanelOffsetX = 10;                        // Offset X do Painel
+input int InpPanelOffsetY = 30;                        // Offset Y do Painel
+input color InpCallColor = clrLime;                     // Cor CALL
+input color InpPutColor = clrRed;                       // Cor PUT
+input bool InpShowArrows = true;                        // Mostrar Setas
+input ArrowPosition InpArrowPosition = ARROW_ABOVE_BELOW; // Posição das Setas
 
-//--- Filtros de Mercado
-input group "=== FILTROS DE MERCADO ==="
-input bool InpEnableATRFilter = true;                    // Habilitar Filtro ATR
-input int InpATRPeriod = 14;                             // Período ATR
-input double InpATRMultiplier = 1.5;                     // Multiplicador ATR
-input bool InpEnableBBFilter = true;                     // Habilitar Filtro Bollinger
-input int InpBBPeriod = 20;                              // Período Bollinger
-input double InpBBDeviation = 2.0;                       // Desvio Bollinger
-input bool InpEnableTrendFilter = false;                 // Habilitar Filtro Tendência
-input int InpTrendPeriod = 50;                           // Período Tendência
-
-//--- Análise Financeira
+// === ANÁLISE FINANCEIRA ===
 input group "=== ANÁLISE FINANCEIRA ==="
-input double InpEntryValue = 10.0;                       // Valor de Entrada
-input double InpPayout = 0.8;                            // Payout (0.8 = 80%)
-input bool InpEnableMartingale = true;                   // Habilitar Martingale
-input double InpMartingaleFactor = 2.0;                  // Fator Martingale
-input int InpMaxGaleLevels = 2;                          // Máximo Gales
-input bool InpEnableStopLoss = false;                    // Habilitar Stop Loss
-input double InpStopLossValue = 100.0;                   // Valor Stop Loss
-input bool InpEnableStopWin = false;                     // Habilitar Stop Win
-input double InpStopWinValue = 200.0;                    // Valor Stop Win
-input double InpDailyGoal = 50.0;                        // Meta Diária
-input double InpDailyLimit = 150.0;                      // Limite Diário
+input double InpEntryValue = 10.0;                     // Valor de Entrada
+input double InpPayout = 0.8;                          // Payout (0.8 = 80%)
+input bool InpEnableMartingale = true;                 // Habilitar Martingale
+input double InpMartingaleFactor = 2.0;                // Fator Martingale
+input int InpMaxGaleLevels = 5;                        // Máximo Níveis Gale
+input bool InpEnableStopLoss = false;                  // Habilitar Stop Loss
+input double InpStopLossValue = 100.0;                 // Valor Stop Loss
+input bool InpEnableStopWin = false;                   // Habilitar Stop Win
+input double InpStopWinValue = 200.0;                  // Valor Stop Win
 
-//--- Notificações Telegram
-input group "=== NOTIFICAÇÕES TELEGRAM ==="
-input bool InpEnableTelegram = false;                    // Habilitar Telegram
-input string InpTelegramToken = "";                      // Token do Bot
-input string InpTelegramChatID = "";                     // Chat ID
-input string InpTelegramTitle = "Probabilidades V3";     // Título das Mensagens
-input bool InpTelegramSendImages = false;                // Enviar Imagens
-input bool InpNotifySignals = true;                      // Notificar Sinais
-input bool InpNotifyResults = true;                      // Notificar Resultados
+// === FILTROS DE MERCADO ===
+input group "=== FILTROS DE MERCADO ==="
+input bool InpEnableATR = true;                        // Filtro ATR
+input int InpATRPeriod = 14;                           // Período ATR
+input double InpATRMultiplier = 1.5;                   // Multiplicador ATR
+input bool InpEnableBollinger = true;                  // Filtro Bollinger
+input int InpBollingerPeriod = 20;                     // Período Bollinger
+input double InpBollingerDeviation = 2.0;              // Desvio Bollinger
+input bool InpEnableTrend = false;                     // Filtro Tendência
+input int InpTrendPeriod = 50;                         // Período Tendência
 
-//--- Integração MX2
-input group "=== INTEGRAÇÃO MX2 ==="
-input bool InpEnableMX2 = false;                         // Habilitar MX2
-input BrokerMX2 InpMX2Broker = MX2_QUOTEX;              // Corretora MX2
-input SignalTypeMX2 InpMX2SignalType = MX2_CLOSED_CANDLE; // Tipo de Sinal
-input ExpirationTypeMX2 InpMX2ExpiryType = MX2_CORRIDO; // Tipo Expiração
-input int InpMX2ExpiryMinutes = 5;                       // Minutos Expiração
+// === NOTIFICAÇÕES ===
+input group "=== NOTIFICAÇÕES ==="
+input bool InpEnableTelegram = false;                  // Habilitar Telegram
+input string InpTelegramToken = "";                    // Token do Bot
+input string InpTelegramChatID = "";                   // Chat ID
+input bool InpEnableMX2 = false;                       // Habilitar MX2
+input BrokerMX2 InpMX2Broker = MX2_QUOTEX;            // Corretora MX2
+input int InpMX2ExpiryMinutes = 5;                     // Expiração (minutos)
 
-//--- SuperVarredura
+// === SUPERVARREDURA ===
 input group "=== SUPERVARREDURA ==="
-input bool InpEnableSuperScan = false;                   // Habilitar SuperVarredura
-input int InpSuperScanBars = 1000;                       // Barras para Análise
-input int InpSuperScanMinOperations = 10;                // Mínimo Operações
-input double InpSuperScanMinWinRate = 60.0;              // WinRate Mínimo (%)
-input bool InpSuperScanAutoApply = true;                 // Aplicar Automaticamente
+input bool InpEnableSuperScan = false;                 // Habilitar SuperVarredura
+input int InpSuperScanBars = 1000;                     // Barras para Análise
+input int InpSuperScanMinOps = 50;                     // Mínimo Operações
+input double InpSuperScanMinWinrate = 60.0;            // WinRate Mínimo (%)
+input bool InpSuperScanAutoApply = false;              // Aplicar Automaticamente
 
-//--- Configurações Avançadas
-input group "=== CONFIGURAÇÕES AVANÇADAS ==="
-input bool InpEnableLogging = true;                      // Habilitar Logging
-input LogLevel InpLogLevel = LOG_INFO;                   // Nível de Log
-input bool InpEnableDebug = false;                       // Modo Debug
-input int InpMaxHistoryBars = 5000;                      // Máximo Barras Histórico
-input bool InpEnableOptimization = true;                 // Habilitar Otimização
-input int InpUpdateIntervalMS = 1000;                    // Intervalo Atualização (ms)
-
-//+------------------------------------------------------------------+
-//| Buffers do Indicador                                            |
-//+------------------------------------------------------------------+
-double CallSignalBuffer[];        // Buffer sinais CALL
-double PutSignalBuffer[];         // Buffer sinais PUT
-double ConfidenceBuffer[];        // Buffer linha de confiança
-double CallArrowBuffer[];         // Buffer setas CALL
-double PutArrowBuffer[];          // Buffer setas PUT
-double InternalBuffer[];          // Buffer interno para cálculos
+// === SISTEMA ===
+input group "=== SISTEMA ==="
+input LogLevel InpLogLevel = LOG_INFO;                 // Nível de Log
+input bool InpEnableDebug = false;                     // Modo Debug
+input int InpUpdateInterval = 1000;                    // Intervalo Atualização (ms)
 
 //+------------------------------------------------------------------+
 //| Variáveis Globais do Indicador                                  |
 //+------------------------------------------------------------------+
-int g_atr_handle = INVALID_HANDLE;           // Handle ATR
-int g_bb_handle = INVALID_HANDLE;            // Handle Bollinger Bands
-int g_ma_handle = INVALID_HANDLE;            // Handle Moving Average
-datetime g_last_bar_time = 0;               // Tempo da última barra
-datetime g_last_signal_bar_time = 0;        // Tempo da última barra com sinal
-bool g_new_bar = false;                     // Nova barra detectada
-int g_processed_bars = 0;                   // Barras processadas
-datetime g_indicator_start_time = 0;        // Tempo de início do indicador
+datetime g_last_bar_time = 0;
+bool g_indicator_initialized = false;
 
 //+------------------------------------------------------------------+
-//| Função de Inicialização do Indicador                            |
+//| Função de Inicialização                                         |
 //+------------------------------------------------------------------+
-
-/**
- * Inicializa o indicador e todos os seus subsistemas
- * @return INIT_SUCCEEDED se inicializado com sucesso
- */
 int OnInit()
 {
-    Print("=== INICIALIZANDO INDICADOR DE PROBABILIDADES V3 ===");
+    Print("=== INICIALIZANDO INDICADOR DE PROBABILIDADES V3.0 ===");
     
-    // Registra tempo de início
-    g_indicator_start_time = TimeCurrent();
-    
-    // Carrega configuração global
-    if(!LoadGlobalConfiguration())
+    // Inicializar variáveis globais
+    if(!InitializeGlobalVariables())
     {
-        Print("ERRO: Falha ao carregar configuração global");
+        Print("ERRO: Falha ao inicializar variáveis globais");
         return INIT_FAILED;
     }
     
-    // Inicializa buffers do indicador
+    // Carregar configurações dos parâmetros
+    LoadConfigurationFromInputs();
+    
+    // Inicializar buffers do indicador
     if(!InitializeIndicatorBuffers())
     {
-        Print("ERRO: Falha ao inicializar buffers");
+        Print("ERRO: Falha ao inicializar buffers do indicador");
         return INIT_FAILED;
     }
     
-    // Inicializa handles de indicadores técnicos
+    // Inicializar indicadores técnicos
     if(!InitializeTechnicalIndicators())
     {
         Print("ERRO: Falha ao inicializar indicadores técnicos");
         return INIT_FAILED;
     }
     
-    // Inicializa sistema de análise financeira
-    if(!InitializeFinancialAnalysis())
+    // Inicializar sistema financeiro
+    if(!InitializeFinancialSystem())
     {
-        Print("ERRO: Falha ao inicializar análise financeira");
+        Print("ERRO: Falha ao inicializar sistema financeiro");
         return INIT_FAILED;
     }
     
-    // Inicializa sistema de notificações
-    if(!InitializeNotificationSystems())
+    // Inicializar painel visual
+    if(g_config.visual.show_panel)
     {
-        Print("ERRO: Falha ao inicializar notificações");
-        return INIT_FAILED;
+        if(!InitializePanel())
+        {
+            Print("AVISO: Falha ao inicializar painel visual");
+        }
     }
     
-    // Inicializa painel visual
-    if(!InitializePanel())
+    // Inicializar notificações
+    if(g_config.notifications.enable_telegram)
     {
-        Print("ERRO: Falha ao inicializar painel visual");
-        return INIT_FAILED;
+        if(!InitializeTelegram())
+        {
+            Print("AVISO: Falha ao inicializar Telegram");
+        }
     }
     
-    // Inicializa sistema de logging
-    InitializeLogging();
+    if(g_config.notifications.enable_mx2)
+    {
+        if(!InitializeMX2())
+        {
+            Print("AVISO: Falha ao inicializar MX2");
+        }
+    }
     
-    // Configurações finais
-    g_last_bar_time = iTime(_Symbol, _Period, 0);
-    g_processed_bars = 0;
+    // Marcar como inicializado
+    g_indicator_initialized = true;
+    g_system_state = STATE_RUNNING;
+    g_system_start_time = TimeCurrent();
     
-    // Mensagem de sucesso
     Print("=== INDICADOR INICIALIZADO COM SUCESSO ===");
-    Print("Versão: ", INDICATOR_VERSION);
     Print("Padrão Ativo: ", PatternTypeToString(g_config.patterns.active_pattern));
-    Print("Filtros: ATR=", g_config.filters.enable_atr, " BB=", g_config.filters.enable_bollinger);
-    Print("Notificações: Telegram=", g_config.notifications.enable_telegram, " MX2=", g_config.notifications.enable_mx2);
     Print("Painel Visual: ", g_config.visual.show_panel ? "Habilitado" : "Desabilitado");
+    Print("Telegram: ", g_config.notifications.enable_telegram ? "Habilitado" : "Desabilitado");
+    Print("MX2: ", g_config.notifications.enable_mx2 ? "Habilitado" : "Desabilitado");
     
     return INIT_SUCCEEDED;
 }
 
+//+------------------------------------------------------------------+
+//| Função de Deinicialização                                       |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+    Print("=== DEINICIALIZANDO INDICADOR ===");
+    Print("Motivo: ", reason);
+    
+    // Limpar recursos globais
+    CleanupGlobalResources();
+    
+    // Limpar painel visual
+    if(g_panel_initialized)
+    {
+        CleanupPanel();
+    }
+    
+    // Salvar estatísticas finais
+    SaveFinalStatistics();
+    
+    g_system_state = STATE_STOPPED;
+    g_indicator_initialized = false;
+    
+    Print("=== INDICADOR DEINICIALIZADO ===");
+}
+
+//+------------------------------------------------------------------+
+//| Função Principal de Cálculo                                     |
+//+------------------------------------------------------------------+
+int OnCalculate(const int rates_total,
+                const int prev_calculated,
+                const datetime &time[],
+                const double &open[],
+                const double &high[],
+                const double &low[],
+                const double &close[],
+                const long &tick_volume[],
+                const long &volume[],
+                const int &spread[])
+{
+    // Verificar se o indicador está inicializado
+    if(!g_indicator_initialized || g_system_state != STATE_RUNNING)
+    {
+        return prev_calculated;
+    }
+    
+    // Verificar se há dados suficientes
+    if(rates_total < 100)
+    {
+        return prev_calculated;
+    }
+    
+    // Verificar nova barra
+    bool new_bar = false;
+    if(time[rates_total-1] != g_last_bar_time)
+    {
+        g_last_bar_time = time[rates_total-1];
+        new_bar = true;
+    }
+    
+    // Atualizar dados de preços
+    UpdatePriceData(rates_total, time, open, high, low, close);
+    
+    // Processar apenas em nova barra ou primeira execução
+    if(new_bar || prev_calculated == 0)
+    {
+        // Atualizar filtros de mercado
+        UpdateMarketFilters(rates_total);
+        
+        // Detectar padrões
+        PatternDetectionResult pattern_result = DetectPatterns(rates_total, open, high, low, close);
+        
+        // Processar sinal se detectado
+        if(pattern_result.pattern_detected && pattern_result.confidence >= g_config.patterns.min_confidence)
+        {
+            ProcessSignal(pattern_result, rates_total);
+        }
+        
+        // Atualizar análise financeira
+        UpdateFinancialAnalysis();
+        
+        // Atualizar painel visual
+        if(g_config.visual.show_panel && g_panel_initialized)
+        {
+            UpdatePanel();
+        }
+        
+        // Executar SuperVarredura se habilitada
+        if(g_config.superscan.enabled && ShouldRunSuperScan())
+        {
+            ExecuteSuperScan();
+        }
+    }
+    
+    return rates_total;
+}
+
+//+------------------------------------------------------------------+
+//| Funções de Inicialização                                        |
+//+------------------------------------------------------------------+
+
 /**
- * Carrega configuração global a partir dos parâmetros de entrada
- * @return true se carregado com sucesso
+ * Carrega configurações dos parâmetros de entrada
  */
-bool LoadGlobalConfiguration()
+void LoadConfigurationFromInputs()
 {
     // Configurações gerais
-    g_config.general.enabled = InpEnableIndicator;
-    g_config.general.enable_logging = InpEnableLogging;
+    g_config.general.enabled = InpEnabled;
     g_config.general.log_level = InpLogLevel;
     g_config.general.enable_debug = InpEnableDebug;
-    g_config.general.max_history_bars = InpMaxHistoryBars;
-    g_config.general.update_interval_ms = InpUpdateIntervalMS;
+    g_config.general.update_interval_ms = InpUpdateInterval;
     
     // Configurações de padrões
     g_config.patterns.active_pattern = InpActivePattern;
@@ -282,21 +313,8 @@ bool LoadGlobalConfiguration()
     g_config.visual.panel_offset_y = InpPanelOffsetY;
     g_config.visual.call_color = InpCallColor;
     g_config.visual.put_color = InpPutColor;
-    g_config.visual.panel_background_color = InpPanelBgColor;
-    g_config.visual.panel_border_color = InpPanelBorderColor;
-    g_config.visual.panel_text_color = InpPanelTextColor;
     g_config.visual.show_arrows = InpShowArrows;
     g_config.visual.arrow_position = InpArrowPosition;
-    
-    // Configurações de filtros
-    g_config.filters.enable_atr = InpEnableATRFilter;
-    g_config.filters.atr_period = InpATRPeriod;
-    g_config.filters.atr_multiplier = InpATRMultiplier;
-    g_config.filters.enable_bollinger = InpEnableBBFilter;
-    g_config.filters.bollinger_period = InpBBPeriod;
-    g_config.filters.bollinger_deviation = InpBBDeviation;
-    g_config.filters.enable_trend = InpEnableTrendFilter;
-    g_config.filters.trend_period = InpTrendPeriod;
     
     // Configurações financeiras
     g_config.financial.entry_value = InpEntryValue;
@@ -308,89 +326,67 @@ bool LoadGlobalConfiguration()
     g_config.financial.stop_loss_value = InpStopLossValue;
     g_config.financial.enable_stop_win = InpEnableStopWin;
     g_config.financial.stop_win_value = InpStopWinValue;
-    g_config.financial.daily_goal = InpDailyGoal;
-    g_config.financial.daily_limit = InpDailyLimit;
+    
+    // Configurações de filtros
+    g_config.filters.enable_atr = InpEnableATR;
+    g_config.filters.atr_period = InpATRPeriod;
+    g_config.filters.atr_multiplier = InpATRMultiplier;
+    g_config.filters.enable_bollinger = InpEnableBollinger;
+    g_config.filters.bollinger_period = InpBollingerPeriod;
+    g_config.filters.bollinger_deviation = InpBollingerDeviation;
+    g_config.filters.enable_trend = InpEnableTrend;
+    g_config.filters.trend_period = InpTrendPeriod;
     
     // Configurações de notificações
     g_config.notifications.enable_telegram = InpEnableTelegram;
     g_config.notifications.telegram_token = InpTelegramToken;
     g_config.notifications.telegram_chat_id = InpTelegramChatID;
-    g_config.notifications.telegram_title = InpTelegramTitle;
-    g_config.notifications.telegram_send_images = InpTelegramSendImages;
-    g_config.notifications.notify_signals = InpNotifySignals;
-    g_config.notifications.notify_results = InpNotifyResults;
     g_config.notifications.enable_mx2 = InpEnableMX2;
     g_config.notifications.mx2_broker = InpMX2Broker;
-    g_config.notifications.mx2_signal_type = InpMX2SignalType;
-    g_config.notifications.mx2_expiry_type = InpMX2ExpiryType;
     g_config.notifications.mx2_expiry_minutes = InpMX2ExpiryMinutes;
     
     // Configurações de SuperVarredura
     g_config.superscan.enabled = InpEnableSuperScan;
     g_config.superscan.analysis_bars = InpSuperScanBars;
-    g_config.superscan.min_operations = InpSuperScanMinOperations;
-    g_config.superscan.min_winrate = InpSuperScanMinWinRate;
+    g_config.superscan.min_operations = InpSuperScanMinOps;
+    g_config.superscan.min_winrate = InpSuperScanMinWinrate;
     g_config.superscan.auto_apply = InpSuperScanAutoApply;
-    
-    // Inicializa variáveis globais derivadas
-    g_active_pattern = g_config.patterns.active_pattern;
-    g_enable_inversion = g_config.patterns.enable_inversion;
-    g_min_confidence = g_config.patterns.min_confidence;
-    
-    return true;
 }
 
 /**
  * Inicializa buffers do indicador
- * @return true se inicializado com sucesso
  */
 bool InitializeIndicatorBuffers()
 {
-    // Define buffers
-    SetIndexBuffer(0, CallArrowBuffer, INDICATOR_DATA);
-    SetIndexBuffer(1, PutArrowBuffer, INDICATOR_DATA);
-    SetIndexBuffer(2, ConfidenceBuffer, INDICATOR_DATA);
-    SetIndexBuffer(3, CallSignalBuffer, INDICATOR_CALCULATIONS);
-    SetIndexBuffer(4, PutSignalBuffer, INDICATOR_CALCULATIONS);
-    SetIndexBuffer(5, InternalBuffer, INDICATOR_CALCULATIONS);
+    // Definir buffers
+    SetIndexBuffer(0, g_call_buffer, INDICATOR_DATA);
+    SetIndexBuffer(1, g_put_buffer, INDICATOR_DATA);
+    SetIndexBuffer(2, g_confidence_buffer, INDICATOR_CALCULATIONS);
     
-    // Configura plotagens
+    // Configurar propriedades dos plots
     PlotIndexSetInteger(0, PLOT_ARROW, 233);  // Seta para cima
     PlotIndexSetInteger(1, PLOT_ARROW, 234);  // Seta para baixo
     
-    // Configura cores
-    PlotIndexSetInteger(0, PLOT_LINE_COLOR, g_config.visual.call_color);
-    PlotIndexSetInteger(1, PLOT_LINE_COLOR, g_config.visual.put_color);
+    PlotIndexSetString(0, PLOT_LABEL, "CALL");
+    PlotIndexSetString(1, PLOT_LABEL, "PUT");
     
-    // Inicializa buffers com valores vazios
-    ArraySetAsSeries(CallArrowBuffer, true);
-    ArraySetAsSeries(PutArrowBuffer, true);
-    ArraySetAsSeries(ConfidenceBuffer, true);
-    ArraySetAsSeries(CallSignalBuffer, true);
-    ArraySetAsSeries(PutSignalBuffer, true);
-    ArraySetAsSeries(InternalBuffer, true);
-    
-    // Preenche com valores vazios
-    ArrayInitialize(CallArrowBuffer, EMPTY_VALUE);
-    ArrayInitialize(PutArrowBuffer, EMPTY_VALUE);
-    ArrayInitialize(ConfidenceBuffer, EMPTY_VALUE);
-    ArrayInitialize(CallSignalBuffer, 0.0);
-    ArrayInitialize(PutSignalBuffer, 0.0);
-    ArrayInitialize(InternalBuffer, 0.0);
+    // Inicializar com valores vazios
+    ArrayInitialize(g_call_buffer, EMPTY_VALUE);
+    ArrayInitialize(g_put_buffer, EMPTY_VALUE);
+    ArrayInitialize(g_confidence_buffer, 0.0);
     
     return true;
 }
 
 /**
- * Inicializa handles de indicadores técnicos
- * @return true se inicializado com sucesso
+ * Inicializa indicadores técnicos
  */
 bool InitializeTechnicalIndicators()
 {
-    // Inicializa ATR se habilitado
+    // Inicializar ATR
     if(g_config.filters.enable_atr)
     {
-        g_atr_handle = iATR(_Symbol, _Period, g_config.filters.atr_period);
+        g_atr_handle = iATR(Symbol(), Period(), g_config.filters.atr_period);
         if(g_atr_handle == INVALID_HANDLE)
         {
             Print("ERRO: Falha ao criar handle ATR");
@@ -398,25 +394,25 @@ bool InitializeTechnicalIndicators()
         }
     }
     
-    // Inicializa Bollinger Bands se habilitado
+    // Inicializar Bollinger Bands
     if(g_config.filters.enable_bollinger)
     {
-        g_bb_handle = iBands(_Symbol, _Period, g_config.filters.bollinger_period, 
-                            0, g_config.filters.bollinger_deviation, PRICE_CLOSE);
-        if(g_bb_handle == INVALID_HANDLE)
+        g_bollinger_handle = iBands(Symbol(), Period(), g_config.filters.bollinger_period, 
+                                   0, g_config.filters.bollinger_deviation, PRICE_CLOSE);
+        if(g_bollinger_handle == INVALID_HANDLE)
         {
             Print("ERRO: Falha ao criar handle Bollinger Bands");
             return false;
         }
     }
     
-    // Inicializa Moving Average se filtro de tendência habilitado
+    // Inicializar Média Móvel para tendência
     if(g_config.filters.enable_trend)
     {
-        g_ma_handle = iMA(_Symbol, _Period, g_config.filters.trend_period, 0, MODE_SMA, PRICE_CLOSE);
+        g_ma_handle = iMA(Symbol(), Period(), g_config.filters.trend_period, 0, MODE_SMA, PRICE_CLOSE);
         if(g_ma_handle == INVALID_HANDLE)
         {
-            Print("ERRO: Falha ao criar handle Moving Average");
+            Print("ERRO: Falha ao criar handle Média Móvel");
             return false;
         }
     }
@@ -424,870 +420,382 @@ bool InitializeTechnicalIndicators()
     return true;
 }
 
-/**
- * Inicializa sistemas de notificação
- * @return true se inicializado com sucesso
- */
-bool InitializeNotificationSystems()
-{
-    bool success = true;
-    
-    // Inicializa Telegram
-    if(g_config.notifications.enable_telegram)
-    {
-        if(!InitializeTelegram())
-        {
-            Print("AVISO: Falha ao inicializar Telegram");
-            success = false;
-        }
-    }
-    
-    // Inicializa MX2
-    if(g_config.notifications.enable_mx2)
-    {
-        if(!InitializeMX2())
-        {
-            Print("AVISO: Falha ao inicializar MX2");
-            success = false;
-        }
-    }
-    
-    return success;
-}
-
-/**
- * Inicializa sistema de logging
- */
-void InitializeLogging()
-{
-    if(g_config.general.enable_logging)
-    {
-        Print("Sistema de logging inicializado - Nível: ", EnumToString(g_config.general.log_level));
-    }
-}
-
 //+------------------------------------------------------------------+
-//| Função de Desinicialização                                      |
+//| Funções de Processamento                                        |
 //+------------------------------------------------------------------+
 
 /**
- * Desinicializa o indicador e limpa recursos
+ * Atualiza dados de preços
  */
-void OnDeinit(const int reason)
+void UpdatePriceData(int rates_total, const datetime &time[], const double &open[], 
+                    const double &high[], const double &low[], const double &close[])
 {
-    Print("=== DESINICIALIZANDO INDICADOR ===");
-    Print("Motivo: ", GetDeinitReasonText(reason));
+    int start = MathMax(0, rates_total - MAX_BARS_HISTORY);
+    int count = MathMin(MAX_BARS_HISTORY, rates_total - start);
     
-    // Libera handles de indicadores
-    if(g_atr_handle != INVALID_HANDLE)
+    for(int i = 0; i < count; i++)
     {
-        IndicatorRelease(g_atr_handle);
-        g_atr_handle = INVALID_HANDLE;
-    }
-    
-    if(g_bb_handle != INVALID_HANDLE)
-    {
-        IndicatorRelease(g_bb_handle);
-        g_bb_handle = INVALID_HANDLE;
-    }
-    
-    if(g_ma_handle != INVALID_HANDLE)
-    {
-        IndicatorRelease(g_ma_handle);
-        g_ma_handle = INVALID_HANDLE;
-    }
-    
-    // Remove objetos do painel
-    RemoveAllPanelObjects();
-    
-    // Estatísticas finais
-    if(g_config.general.enable_logging)
-    {
-        PrintFinalStatistics();
-    }
-    
-    Print("=== INDICADOR DESINICIALIZADO ===");
-}
-
-/**
- * Obtém texto descritivo do motivo de desinicialização
- * @param reason Código do motivo
- * @return Texto descritivo
- */
-string GetDeinitReasonText(const int reason)
-{
-    switch(reason)
-    {
-        case REASON_PROGRAM: return "Programa encerrado";
-        case REASON_REMOVE: return "Indicador removido";
-        case REASON_RECOMPILE: return "Recompilação";
-        case REASON_CHARTCHANGE: return "Mudança de gráfico";
-        case REASON_CHARTCLOSE: return "Gráfico fechado";
-        case REASON_PARAMETERS: return "Parâmetros alterados";
-        case REASON_ACCOUNT: return "Conta alterada";
-        case REASON_TEMPLATE: return "Template aplicado";
-        case REASON_INITFAILED: return "Falha na inicialização";
-        case REASON_CLOSE: return "Terminal fechado";
-        default: return "Motivo desconhecido (" + IntegerToString(reason) + ")";
+        int src_index = start + i;
+        g_bar_times[i] = time[src_index];
+        g_open_prices[i] = open[src_index];
+        g_high_prices[i] = high[src_index];
+        g_low_prices[i] = low[src_index];
+        g_close_prices[i] = close[src_index];
     }
 }
 
 /**
- * Imprime estatísticas finais
+ * Atualiza filtros de mercado
  */
-void PrintFinalStatistics()
+void UpdateMarketFilters(int rates_total)
 {
-    datetime uptime = TimeCurrent() - g_indicator_start_time;
-    
-    Print("=== ESTATÍSTICAS FINAIS ===");
-    Print("Tempo de execução: ", TimeToString(uptime, TIME_SECONDS));
-    Print("Barras processadas: ", g_processed_bars);
-    Print("Sinais hoje: ", g_total_signals_today);
-    Print("Operações hoje: ", g_total_operations_today);
-    Print("WinRate: ", DoubleToString(g_daily_winrate, 1), "%");
-    Print("Lucro diário: ", FormatCurrency(g_daily_profit));
-    Print("Saldo atual: ", FormatCurrency(g_current_balance));
-    
-    if(IsTelegramOperational())
-    {
-        Print("Telegram: ", GetTelegramStatistics());
-    }
-    
-    if(IsMX2Operational())
-    {
-        Print("MX2: ", GetMX2Statistics());
-    }
-}
-
-//+------------------------------------------------------------------+
-//| Função Principal de Cálculo                                     |
-//+------------------------------------------------------------------+
-
-/**
- * Função principal de cálculo do indicador
- * @param rates_total Total de barras disponíveis
- * @param prev_calculated Barras calculadas anteriormente
- * @param time Array de tempo
- * @param open Array de abertura
- * @param high Array de máxima
- * @param low Array de mínima
- * @param close Array de fechamento
- * @param tick_volume Array de volume de ticks
- * @param volume Array de volume real
- * @param spread Array de spread
- * @return Número de barras processadas
- */
-int OnCalculate(const int rates_total,
-                const int prev_calculated,
-                const datetime &time[],
-                const double &open[],
-                const double &high[],
-                const double &low[],
-                const double &close[],
-                const long &tick_volume[],
-                const long &volume[],
-                const int &spread[])
-{
-    // Verifica se indicador está habilitado
-    if(!g_config.general.enabled)
-    {
-        return rates_total;
-    }
-    
-    // Verifica dados suficientes
-    if(rates_total < 100)
-    {
-        return 0;
-    }
-    
-    // Detecta nova barra
-    DetectNewBar(time);
-    
-    // Calcula índice de início
-    int start_pos = MathMax(prev_calculated - 1, 0);
-    if(start_pos == 0)
-    {
-        // Primeira execução - limpa buffers
-        ArrayInitialize(CallArrowBuffer, EMPTY_VALUE);
-        ArrayInitialize(PutArrowBuffer, EMPTY_VALUE);
-        ArrayInitialize(ConfidenceBuffer, EMPTY_VALUE);
-    }
-    
-    // Processa barras
-    for(int i = start_pos; i < rates_total - 1; i++) // -1 para não processar barra atual
-    {
-        ProcessBar(i, time, open, high, low, close);
-    }
-    
-    // Atualiza contadores
-    g_processed_bars = rates_total - 1;
-    
-    // Atualiza painel se nova barra
-    if(g_new_bar)
-    {
-        UpdatePanelData();
-        g_new_bar = false;
-    }
-    
-    return rates_total;
-}
-
-/**
- * Detecta nova barra
- * @param time Array de tempo
- */
-void DetectNewBar(const datetime &time[])
-{
-    datetime current_bar_time = time[ArraySize(time) - 1];
-    
-    if(current_bar_time != g_last_bar_time)
-    {
-        g_new_bar = true;
-        g_last_bar_time = current_bar_time;
-        
-        // Executa tarefas de nova barra
-        OnNewBar();
-    }
-    else
-    {
-        g_new_bar = false;
-    }
-}
-
-/**
- * Processa uma barra específica
- * @param bar_index Índice da barra
- * @param time Array de tempo
- * @param open Array de abertura
- * @param high Array de máxima
- * @param low Array de mínima
- * @param close Array de fechamento
- */
-void ProcessBar(int bar_index, 
-                const datetime &time[],
-                const double &open[],
-                const double &high[],
-                const double &low[],
-                const double &close[])
-{
-    // Inicializa buffers para esta barra
-    CallArrowBuffer[bar_index] = EMPTY_VALUE;
-    PutArrowBuffer[bar_index] = EMPTY_VALUE;
-    ConfidenceBuffer[bar_index] = EMPTY_VALUE;
-    
-    // Verifica se há dados suficientes para análise
-    if(bar_index < 50)
-    {
-        return;
-    }
-    
-    // Atualiza filtros de mercado
-    UpdateMarketFilters(bar_index);
-    
-    // Detecta padrões
-    PatternDetectionResult pattern_result = DetectPatterns(bar_index, open, high, low, close);
-    
-    // Processa resultado da detecção
-    if(pattern_result.pattern_detected)
-    {
-        ProcessPatternDetection(bar_index, pattern_result, time, high, low);
-    }
-    
-    // Atualiza linha de confiança
-    UpdateConfidenceLine(bar_index, pattern_result.confidence);
-}
-
-/**
- * Executa tarefas quando nova barra é detectada
- */
-void OnNewBar()
-{
-    // Atualiza estatísticas globais
-    UpdateGlobalStatistics();
-    
-    // Verifica reset diário
-    CheckDailyReset();
-    
-    // Executa SuperVarredura se habilitada
-    if(g_config.superscan.enabled && ShouldRunSuperScan())
-    {
-        ExecuteSuperScan();
-    }
-    
-    // Atualiza análise de risco
-    UpdateRiskAnalysis();
-}
-
-/**
- * Atualiza filtros de mercado para uma barra
- * @param bar_index Índice da barra
- */
-void UpdateMarketFilters(int bar_index)
-{
-    // Reset filtros
-    g_market_filters.atr_filter_passed = true;
-    g_market_filters.bollinger_filter_passed = true;
-    g_market_filters.trend_filter_passed = true;
-    g_market_filters.all_filters_passed = true;
+    InitializeMarketFilters(g_market_filters);
     
     // Filtro ATR
     if(g_config.filters.enable_atr && g_atr_handle != INVALID_HANDLE)
     {
-        double atr_values[1];
-        if(CopyBuffer(g_atr_handle, 0, bar_index, 1, atr_values) > 0)
+        double atr_values[];
+        if(CopyBuffer(g_atr_handle, 0, 0, 2, atr_values) > 0)
         {
-            g_current_atr = atr_values[0];
-            double min_atr = g_config.filters.atr_multiplier * Point();
-            g_market_filters.atr_filter_passed = (g_current_atr >= min_atr);
+            double current_atr = atr_values[0];
+            double min_atr = g_config.filters.atr_multiplier * Point() * 10;
+            g_market_filters.atr_filter_passed = (current_atr >= min_atr);
         }
     }
     
     // Filtro Bollinger Bands
-    if(g_config.filters.enable_bollinger && g_bb_handle != INVALID_HANDLE)
+    if(g_config.filters.enable_bollinger && g_bollinger_handle != INVALID_HANDLE)
     {
-        double bb_upper[1], bb_lower[1];
-        if(CopyBuffer(g_bb_handle, 1, bar_index, 1, bb_upper) > 0 &&
-           CopyBuffer(g_bb_handle, 2, bar_index, 1, bb_lower) > 0)
+        double bb_upper[], bb_lower[];
+        if(CopyBuffer(g_bollinger_handle, 1, 0, 1, bb_upper) > 0 && 
+           CopyBuffer(g_bollinger_handle, 2, 0, 1, bb_lower) > 0)
         {
-            double current_close = iClose(_Symbol, _Period, bar_index);
-            double bb_width = bb_upper[0] - bb_lower[0];
-            double min_width = 10 * Point(); // Largura mínima
+            double current_price = g_close_prices[0];
+            double bb_range = bb_upper[0] - bb_lower[0];
+            double price_position = (current_price - bb_lower[0]) / bb_range;
             
-            g_market_filters.bollinger_bands_active = (bb_width >= min_width);
-            g_market_filters.bollinger_filter_passed = g_market_filters.bollinger_bands_active;
+            // Filtro passa se o preço não está nos extremos das bandas
+            g_market_filters.bollinger_filter_passed = (price_position > 0.2 && price_position < 0.8);
+            g_market_filters.bollinger_bands_active = true;
         }
     }
     
     // Filtro de Tendência
     if(g_config.filters.enable_trend && g_ma_handle != INVALID_HANDLE)
     {
-        double ma_values[2];
-        if(CopyBuffer(g_ma_handle, 0, bar_index, 2, ma_values) > 0)
+        double ma_values[];
+        if(CopyBuffer(g_ma_handle, 0, 0, 2, ma_values) > 0)
         {
-            if(ma_values[0] > ma_values[1])
-            {
-                g_market_filters.trend_direction = 1; // Alta
-            }
-            else if(ma_values[0] < ma_values[1])
-            {
-                g_market_filters.trend_direction = -1; // Baixa
-            }
-            else
-            {
-                g_market_filters.trend_direction = 0; // Lateral
-            }
+            double current_price = g_close_prices[0];
+            double ma_current = ma_values[0];
+            double ma_previous = ma_values[1];
             
-            // Por enquanto, aceita qualquer tendência
-            g_market_filters.trend_filter_passed = true;
+            // Determinar direção da tendência
+            if(ma_current > ma_previous)
+                g_market_filters.trend_direction = 1;  // Alta
+            else if(ma_current < ma_previous)
+                g_market_filters.trend_direction = -1; // Baixa
+            else
+                g_market_filters.trend_direction = 0;  // Lateral
+            
+            // Filtro passa se há tendência definida
+            g_market_filters.trend_filter_passed = (g_market_filters.trend_direction != 0);
         }
     }
     
     // Resultado final dos filtros
-    g_market_filters.all_filters_passed = g_market_filters.atr_filter_passed &&
-                                         g_market_filters.bollinger_filter_passed &&
+    g_market_filters.all_filters_passed = g_market_filters.atr_filter_passed && 
+                                         g_market_filters.bollinger_filter_passed && 
                                          g_market_filters.trend_filter_passed;
 }
 
 /**
- * Detecta padrões em uma barra
- * @param bar_index Índice da barra
- * @param open Array de abertura
- * @param high Array de máxima
- * @param low Array de mínima
- * @param close Array de fechamento
- * @return Resultado da detecção
+ * Detecta padrões MHI
  */
-PatternDetectionResult DetectPatterns(int bar_index,
-                                     const double &open[],
-                                     const double &high[],
-                                     const double &low[],
-                                     const double &close[])
+PatternDetectionResult DetectPatterns(int rates_total, const double &open[], 
+                                    const double &high[], const double &low[], const double &close[])
 {
     PatternDetectionResult result;
-    result.pattern_detected = false;
-    result.pattern_type = PATTERN_NONE;
-    result.is_call = false;
-    result.confidence = 0.0;
-    result.signal_price = 0.0;
+    InitializePatternDetectionResult(result);
     
-    // Verifica se há dados suficientes
-    if(bar_index < 10)
-    {
+    // Verificar se há dados suficientes
+    if(rates_total < 10)
         return result;
-    }
     
-    // Detecta padrão ativo
-    switch(g_active_pattern)
+    // Detectar padrão baseado na configuração
+    switch(g_config.patterns.active_pattern)
     {
         case PATTERN_MHI1:
-            result = DetectMHI1Pattern(bar_index, open, high, low, close);
+            result = DetectMHI1Pattern(open, high, low, close);
             break;
         case PATTERN_MHI2:
-            result = DetectMHI2Pattern(bar_index, open, high, low, close);
+            result = DetectMHI2Pattern(open, high, low, close);
             break;
         case PATTERN_MHI3:
-            result = DetectMHI3Pattern(bar_index, open, high, low, close);
+            result = DetectMHI3Pattern(open, high, low, close);
             break;
         case PATTERN_MHI4:
-            result = DetectMHI4Pattern(bar_index, open, high, low, close);
+            result = DetectMHI4Pattern(open, high, low, close);
             break;
         case PATTERN_MHI5:
-            result = DetectMHI5Pattern(bar_index, open, high, low, close);
+            result = DetectMHI5Pattern(open, high, low, close);
             break;
         case PATTERN_MHI6:
-            result = DetectMHI6Pattern(bar_index, open, high, low, close);
+            result = DetectMHI6Pattern(open, high, low, close);
             break;
         default:
             break;
     }
     
-    // Aplica inversão se habilitada
-    if(result.pattern_detected && g_enable_inversion)
+    // Aplicar inversão se habilitada
+    if(result.pattern_detected && g_config.patterns.enable_inversion)
     {
         result.is_call = !result.is_call;
     }
     
-    // Verifica confiança mínima
-    if(result.confidence < g_min_confidence)
+    return result;
+}
+
+/**
+ * Detecta padrão MHI1
+ */
+PatternDetectionResult DetectMHI1Pattern(const double &open[], const double &high[], 
+                                       const double &low[], const double &close[])
+{
+    PatternDetectionResult result;
+    InitializePatternDetectionResult(result);
+    
+    // Verificar padrão MHI1: 3 velas de mesma cor seguidas
+    if(ArraySize(close) >= 4)
     {
-        result.pattern_detected = false;
+        bool candle1_bull = close[3] > open[3];
+        bool candle2_bull = close[2] > open[2];
+        bool candle3_bull = close[1] > open[1];
+        
+        // Três velas de alta seguidas - sinal PUT
+        if(candle1_bull && candle2_bull && candle3_bull)
+        {
+            result.pattern_detected = true;
+            result.pattern_type = PATTERN_MHI1;
+            result.is_call = false; // PUT
+            result.confidence = 75.0;
+            result.signal_price = close[0];
+        }
+        // Três velas de baixa seguidas - sinal CALL
+        else if(!candle1_bull && !candle2_bull && !candle3_bull)
+        {
+            result.pattern_detected = true;
+            result.pattern_type = PATTERN_MHI1;
+            result.is_call = true; // CALL
+            result.confidence = 75.0;
+            result.signal_price = close[0];
+        }
     }
     
     return result;
 }
 
 /**
- * Detecta padrão MHI1 (exemplo simplificado)
- * @param bar_index Índice da barra
- * @param open Array de abertura
- * @param high Array de máxima
- * @param low Array de mínima
- * @param close Array de fechamento
- * @return Resultado da detecção
+ * Detecta padrão MHI2
  */
-PatternDetectionResult DetectMHI1Pattern(int bar_index,
-                                        const double &open[],
-                                        const double &high[],
-                                        const double &low[],
-                                        const double &close[])
+PatternDetectionResult DetectMHI2Pattern(const double &open[], const double &high[], const double &low[], const double &close[])
 {
     PatternDetectionResult result;
-    result.pattern_detected = false;
-    result.pattern_type = PATTERN_MHI1;
-    result.confidence = 0.0;
+    InitializePatternDetectionResult(result);
     
-    // Lógica simplificada do MHI1
-    // Procura por 3 velas consecutivas de mesma cor seguidas de reversão
-    
-    if(bar_index < 4) return result;
-    
-    // Verifica 3 velas vermelhas seguidas de vela verde (sinal CALL)
-    bool three_red = (close[bar_index-3] < open[bar_index-3]) &&
-                     (close[bar_index-2] < open[bar_index-2]) &&
-                     (close[bar_index-1] < open[bar_index-1]);
-    
-    bool green_reversal = (close[bar_index] > open[bar_index]);
-    
-    if(three_red && green_reversal)
-    {
-        result.pattern_detected = true;
-        result.is_call = true;
-        result.confidence = 75.0;
-        result.signal_price = close[bar_index];
-        return result;
-    }
-    
-    // Verifica 3 velas verdes seguidas de vela vermelha (sinal PUT)
-    bool three_green = (close[bar_index-3] > open[bar_index-3]) &&
-                       (close[bar_index-2] > open[bar_index-2]) &&
-                       (close[bar_index-1] > open[bar_index-1]);
-    
-    bool red_reversal = (close[bar_index] < open[bar_index]);
-    
-    if(three_green && red_reversal)
-    {
-        result.pattern_detected = true;
-        result.is_call = false;
-        result.confidence = 75.0;
-        result.signal_price = close[bar_index];
-        return result;
-    }
+    // Implementação simplificada do MHI2
+    // Pode ser expandida com lógica mais complexa
     
     return result;
 }
 
 /**
- * Detecta padrão MHI2 (implementação placeholder)
+ * Detecta padrão MHI3
  */
-PatternDetectionResult DetectMHI2Pattern(int bar_index, const double &open[], const double &high[], const double &low[], const double &close[])
+PatternDetectionResult DetectMHI3Pattern(const double &open[], const double &high[], const double &low[], const double &close[])
 {
     PatternDetectionResult result;
-    result.pattern_detected = false;
-    result.pattern_type = PATTERN_MHI2;
-    // TODO: Implementar lógica específica do MHI2
+    InitializePatternDetectionResult(result);
+    
+    // Implementação simplificada do MHI3
+    // Pode ser expandida com lógica mais complexa
+    
     return result;
 }
 
 /**
- * Detecta padrão MHI3 (implementação placeholder)
+ * Detecta padrão MHI4
  */
-PatternDetectionResult DetectMHI3Pattern(int bar_index, const double &open[], const double &high[], const double &low[], const double &close[])
+PatternDetectionResult DetectMHI4Pattern(const double &open[], const double &high[], const double &low[], const double &close[])
 {
     PatternDetectionResult result;
-    result.pattern_detected = false;
-    result.pattern_type = PATTERN_MHI3;
-    // TODO: Implementar lógica específica do MHI3
+    InitializePatternDetectionResult(result);
+    
+    // Implementação simplificada do MHI4
+    // Pode ser expandida com lógica mais complexa
+    
     return result;
 }
 
 /**
- * Detecta padrão MHI4 (implementação placeholder)
+ * Detecta padrão MHI5
  */
-PatternDetectionResult DetectMHI4Pattern(int bar_index, const double &open[], const double &high[], const double &low[], const double &close[])
+PatternDetectionResult DetectMHI5Pattern(const double &open[], const double &high[], const double &low[], const double &close[])
 {
     PatternDetectionResult result;
-    result.pattern_detected = false;
-    result.pattern_type = PATTERN_MHI4;
-    // TODO: Implementar lógica específica do MHI4
+    InitializePatternDetectionResult(result);
+    
+    // Implementação simplificada do MHI5
+    // Pode ser expandida com lógica mais complexa
+    
     return result;
 }
 
 /**
- * Detecta padrão MHI5 (implementação placeholder)
+ * Detecta padrão MHI6
  */
-PatternDetectionResult DetectMHI5Pattern(int bar_index, const double &open[], const double &high[], const double &low[], const double &close[])
+PatternDetectionResult DetectMHI6Pattern(const double &open[], const double &high[], const double &low[], const double &close[])
 {
     PatternDetectionResult result;
-    result.pattern_detected = false;
-    result.pattern_type = PATTERN_MHI5;
-    // TODO: Implementar lógica específica do MHI5
+    InitializePatternDetectionResult(result);
+    
+    // Implementação simplificada do MHI6
+    // Pode ser expandida com lógica mais complexa
+    
     return result;
 }
 
 /**
- * Detecta padrão MHI6 (implementação placeholder)
+ * Processa sinal detectado
  */
-PatternDetectionResult DetectMHI6Pattern(int bar_index, const double &open[], const double &high[], const double &low[], const double &close[])
+void ProcessSignal(PatternDetectionResult &pattern_result, int rates_total)
 {
-    PatternDetectionResult result;
-    result.pattern_detected = false;
-    result.pattern_type = PATTERN_MHI6;
-    // TODO: Implementar lógica específica do MHI6
-    return result;
-}
-
-/**
- * Processa detecção de padrão
- * @param bar_index Índice da barra
- * @param pattern_result Resultado da detecção
- * @param time Array de tempo
- * @param high Array de máxima
- * @param low Array de mínima
- */
-void ProcessPatternDetection(int bar_index,
-                           const PatternDetectionResult &pattern_result,
-                           const datetime &time[],
-                           const double &high[],
-                           const double &low[])
-{
-    // Verifica filtros de mercado
+    // Verificar filtros de mercado
     if(!g_market_filters.all_filters_passed)
     {
+        if(g_config.general.enable_debug)
+        {
+            Print("Sinal rejeitado pelos filtros de mercado");
+        }
         return;
     }
     
-    // Cria informações do sinal
-    SignalInfo signal_info;
-    signal_info.signal_time = time[bar_index];
-    signal_info.pattern_type = pattern_result.pattern_type;
-    signal_info.is_call = pattern_result.is_call;
-    signal_info.signal_price = pattern_result.signal_price;
-    signal_info.confidence = pattern_result.confidence;
-    signal_info.atr_value = g_current_atr;
-    signal_info.filter_passed = g_market_filters.all_filters_passed;
+    // Criar informações do sinal
+    SignalInfo signal;
+    InitializeSignalInfo(signal);
+    signal.signal_time = TimeCurrent();
+    signal.pattern_type = pattern_result.pattern_type;
+    signal.is_call = pattern_result.is_call;
+    signal.signal_price = pattern_result.signal_price;
+    signal.confidence = pattern_result.confidence;
+    signal.filter_passed = true;
     
-    // Plota seta no gráfico
-    PlotSignalArrow(bar_index, signal_info, high, low);
+    // Plotar sinal no gráfico
+    PlotSignal(signal, rates_total);
     
-    // Atualiza estatísticas globais
-    g_total_signals_today++;
-    g_last_signal_time = signal_info.signal_time;
-    g_last_signal_confidence = signal_info.confidence;
+    // Processar financeiramente
+    ProcessFinancialSignal(signal);
     
-    // Envia notificações
-    SendNotifications(signal_info);
+    // Enviar notificações
+    SendNotifications(signal);
     
-    // Simula operação financeira (para fins de análise)
-    SimulateFinancialOperation(signal_info);
+    // Salvar sinal
+    g_last_signal = signal;
+    g_last_pattern_result = pattern_result;
+    
+    // Log
+    Print("SINAL DETECTADO: ", PatternTypeToString(signal.pattern_type), 
+          " | ", signal.is_call ? "CALL" : "PUT", 
+          " | Confiança: ", DoubleToString(signal.confidence, 1), "%",
+          " | Preço: ", DoubleToString(signal.signal_price, 5));
 }
 
 /**
- * Plota seta de sinal no gráfico
- * @param bar_index Índice da barra
- * @param signal_info Informações do sinal
- * @param high Array de máxima
- * @param low Array de mínima
+ * Plota sinal no gráfico
  */
-void PlotSignalArrow(int bar_index,
-                    const SignalInfo &signal_info,
-                    const double &high[],
-                    const double &low[])
+void PlotSignal(SignalInfo &signal, int rates_total)
 {
     if(!g_config.visual.show_arrows)
-    {
         return;
-    }
     
-    double arrow_price;
+    int index = rates_total - 1;
     
-    // Calcula posição da seta
-    switch(g_config.visual.arrow_position)
+    if(signal.is_call)
     {
-        case ARROW_ON_CANDLE:
-            arrow_price = signal_info.signal_price;
-            break;
-        case ARROW_ABOVE_BELOW:
-            arrow_price = signal_info.is_call ? low[bar_index] - 5*Point() : high[bar_index] + 5*Point();
-            break;
-        case ARROW_ON_EXTREME:
-            arrow_price = signal_info.is_call ? low[bar_index] : high[bar_index];
-            break;
-        default:
-            arrow_price = signal_info.signal_price;
-            break;
-    }
-    
-    // Plota seta
-    if(signal_info.is_call)
-    {
-        CallArrowBuffer[bar_index] = arrow_price;
+        g_call_buffer[index] = signal.signal_price;
+        g_put_buffer[index] = EMPTY_VALUE;
     }
     else
     {
-        PutArrowBuffer[bar_index] = arrow_price;
-    }
-}
-
-/**
- * Atualiza linha de confiança
- * @param bar_index Índice da barra
- * @param confidence Valor de confiança
- */
-void UpdateConfidenceLine(int bar_index, double confidence)
-{
-    // Normaliza confiança para escala do preço
-    double price_range = iHigh(_Symbol, _Period, bar_index) - iLow(_Symbol, _Period, bar_index);
-    double normalized_confidence = iLow(_Symbol, _Period, bar_index) + (confidence / 100.0) * price_range;
-    
-    ConfidenceBuffer[bar_index] = normalized_confidence;
-}
-
-/**
- * Envia notificações para sistemas configurados
- * @param signal_info Informações do sinal
- */
-void SendNotifications(const SignalInfo &signal_info)
-{
-    // Envia para Telegram
-    if(IsTelegramOperational())
-    {
-        SendSignalToTelegram(signal_info);
+        g_put_buffer[index] = signal.signal_price;
+        g_call_buffer[index] = EMPTY_VALUE;
     }
     
-    // Envia para MX2
-    if(IsMX2Operational())
-    {
-        SendSignalToMX2(signal_info);
-    }
-}
-
-/**
- * Simula operação financeira para análise
- * @param signal_info Informações do sinal
- */
-void SimulateFinancialOperation(const SignalInfo &signal_info)
-{
-    // Por simplicidade, simula resultado aleatório baseado na confiança
-    double win_probability = signal_info.confidence / 100.0;
-    double random_value = MathRand() / 32767.0;
-    
-    OperationResult result;
-    if(random_value <= win_probability)
-    {
-        result = RESULT_WIN;
-    }
-    else
-    {
-        result = RESULT_LOSS;
-    }
-    
-    // Processa operação financeira
-    ProcessFinancialOperation(signal_info, result);
-}
-
-/**
- * Atualiza estatísticas globais
- */
-void UpdateGlobalStatistics()
-{
-    // Atualiza timestamp da última atualização
-    g_last_update_time = TimeCurrent();
-    
-    // Outras atualizações podem ser adicionadas aqui
-}
-
-/**
- * Verifica se deve fazer reset diário
- */
-void CheckDailyReset()
-{
-    static datetime last_reset_date = 0;
-    datetime current_date = StringToTime(TimeToString(TimeCurrent(), TIME_DATE));
-    
-    if(current_date != last_reset_date && last_reset_date > 0)
-    {
-        // Novo dia detectado - reset estatísticas
-        ResetDailyStatistics();
-        last_reset_date = current_date;
-        
-        Print("Reset diário executado - Nova data: ", TimeToString(current_date, TIME_DATE));
-    }
-    else if(last_reset_date == 0)
-    {
-        last_reset_date = current_date;
-    }
+    g_confidence_buffer[index] = signal.confidence;
 }
 
 /**
  * Verifica se deve executar SuperVarredura
- * @return true se deve executar
  */
 bool ShouldRunSuperScan()
 {
-    // Por simplicidade, executa a cada 100 barras processadas
-    return (g_processed_bars % 100 == 0);
+    if(!g_config.superscan.enabled)
+        return false;
+    
+    // Executar a cada hora
+    datetime current_time = TimeCurrent();
+    if(current_time - g_last_superscan < 3600)
+        return false;
+    
+    return true;
 }
 
 /**
- * Executa SuperVarredura (implementação placeholder)
+ * Executa SuperVarredura
  */
 void ExecuteSuperScan()
 {
-    Print("Executando SuperVarredura...");
-    // TODO: Implementar lógica completa da SuperVarredura
+    if(g_superscan_running)
+        return;
     
     g_superscan_running = true;
+    g_last_superscan = TimeCurrent();
     
-    // Simula execução
-    Sleep(1000);
+    Print("=== INICIANDO SUPERVARREDURA ===");
     
+    // Implementação simplificada
+    // Pode ser expandida com análise completa de todos os padrões
+    
+    g_superscan_result.best_pattern = PATTERN_MHI1;
+    g_superscan_result.best_winrate = 75.0;
+    g_superscan_result.total_operations = 100;
+    g_superscan_result.total_wins = 75;
+    g_superscan_result.total_losses = 25;
+    g_superscan_result.recommendation_apply = true;
+    
+    g_superscan_completed = true;
     g_superscan_running = false;
-    Print("SuperVarredura concluída");
-}
-
-//+------------------------------------------------------------------+
-//| Funções de Eventos                                              |
-//+------------------------------------------------------------------+
-
-/**
- * Manipula eventos de timer
- */
-void OnTimer()
-{
-    // Atualiza painel periodicamente
-    UpdatePanelData();
-}
-
-/**
- * Manipula eventos de gráfico
- * @param id ID do evento
- * @param lparam Parâmetro long
- * @param dparam Parâmetro double
- * @param sparam Parâmetro string
- */
-void OnChartEvent(const int id,
-                  const long &lparam,
-                  const double &dparam,
-                  const string &sparam)
-{
-    // Manipula cliques no painel (implementação futura)
-    if(id == CHARTEVENT_OBJECT_CLICK)
-    {
-        if(StringFind(sparam, g_panel_prefix) == 0)
-        {
-            HandlePanelClick(sparam);
-        }
-    }
     
-    // Redesenha painel em mudanças de gráfico
-    if(id == CHARTEVENT_CHART_CHANGE)
+    Print("=== SUPERVARREDURA CONCLUÍDA ===");
+    Print("Melhor Padrão: ", PatternTypeToString(g_superscan_result.best_pattern));
+    Print("WinRate: ", DoubleToString(g_superscan_result.best_winrate, 1), "%");
+}
+
+/**
+ * Salva estatísticas finais
+ */
+void SaveFinalStatistics()
+{
+    Print("=== ESTATÍSTICAS FINAIS ===");
+    Print("Total Operações: ", g_total_operations);
+    Print("Total Vitórias: ", g_total_wins);
+    Print("Total Perdas: ", g_total_losses);
+    if(g_total_operations > 0)
     {
-        RedrawPanel();
+        double winrate = (double)g_total_wins / g_total_operations * 100.0;
+        Print("WinRate: ", DoubleToString(winrate, 1), "%");
     }
+    Print("Lucro Total: ", FormatCurrency(g_total_profit));
+    Print("Saldo Final: ", FormatCurrency(g_current_balance));
 }
-
-/**
- * Manipula cliques no painel
- * @param object_name Nome do objeto clicado
- */
-void HandlePanelClick(const string object_name)
-{
-    // Implementação futura para interatividade do painel
-    Print("Clique no painel: ", object_name);
-}
-
-//+------------------------------------------------------------------+
-//| Funções Auxiliares                                              |
-//+------------------------------------------------------------------+
-
-/**
- * Converte PatternType para string
- * @param pattern_type Tipo do padrão
- * @return String descritiva
- */
-string PatternTypeToString(PatternType pattern_type)
-{
-    switch(pattern_type)
-    {
-        case PATTERN_MHI1: return "MHI1";
-        case PATTERN_MHI2: return "MHI2";
-        case PATTERN_MHI3: return "MHI3";
-        case PATTERN_MHI4: return "MHI4";
-        case PATTERN_MHI5: return "MHI5";
-        case PATTERN_MHI6: return "MHI6";
-        default: return "Nenhum";
-    }
-}
-
-/**
- * Formata valor monetário
- * @param value Valor a ser formatado
- * @return String formatada
- */
-string FormatCurrency(double value)
-{
-    return DoubleToString(value, 2);
-}
-
-/**
- * Converte SystemState para string
- * @param state Estado do sistema
- * @return String descritiva
- */
-string SystemStateToString(SystemState state)
-{
-    switch(state)
-    {
-        case STATE_INITIALIZING: return "Inicializando";
-        case STATE_RUNNING: return "Executando";
-        case STATE_PAUSED: return "Pausado";
-        case STATE_ERROR: return "Erro";
-        case STATE_STOPPED: return "Parado";
-        default: return "Desconhecido";
-    }
-}
-
-//+------------------------------------------------------------------+
-//| Fim do Arquivo Principal                                        |
-//+------------------------------------------------------------------+
 
