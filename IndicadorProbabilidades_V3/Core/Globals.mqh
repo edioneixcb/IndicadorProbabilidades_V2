@@ -144,6 +144,18 @@ datetime g_operation_times[];
 PatternType g_operation_patterns[];
 
 //+------------------------------------------------------------------+
+//| Variáveis Específicas do Telegram                               |
+//+------------------------------------------------------------------+
+TelegramConfig g_telegram_config;
+string g_last_telegram_response = "";
+MessageTemplates g_message_templates;
+int g_telegram_messages_sent = 0;
+int g_telegram_messages_success = 0;
+int g_telegram_messages_failed = 0;
+datetime g_last_telegram_message_time = 0;
+string g_telegram_base_url = "";
+
+//+------------------------------------------------------------------+
 //| Funções de Inicialização de Variáveis Globais                   |
 //+------------------------------------------------------------------+
 
@@ -232,21 +244,31 @@ bool InitializeGlobalVariables()
     g_log_entry_count = 0;
     g_last_log_cleanup = 0;
     
-    // Arrays
-    ArrayResize(g_close_prices, MAX_BARS_HISTORY);
-    ArrayResize(g_open_prices, MAX_BARS_HISTORY);
-    ArrayResize(g_high_prices, MAX_BARS_HISTORY);
-    ArrayResize(g_low_prices, MAX_BARS_HISTORY);
-    ArrayResize(g_bar_times, MAX_BARS_HISTORY);
+    // Telegram
+    InitializeTelegramConfig();
+    g_last_telegram_response = "";
+    InitializeMessageTemplates();
+    g_telegram_messages_sent = 0;
+    g_telegram_messages_success = 0;
+    g_telegram_messages_failed = 0;
+    g_last_telegram_message_time = 0;
+    g_telegram_base_url = "";
     
-    ArrayResize(g_call_buffer, MAX_BARS_HISTORY);
-    ArrayResize(g_put_buffer, MAX_BARS_HISTORY);
-    ArrayResize(g_confidence_buffer, MAX_BARS_HISTORY);
+    // Arrays
+    ArrayResize(g_close_prices, 1000);
+    ArrayResize(g_open_prices, 1000);
+    ArrayResize(g_high_prices, 1000);
+    ArrayResize(g_low_prices, 1000);
+    ArrayResize(g_bar_times, 1000);
+    
+    ArrayResize(g_call_buffer, 1000);
+    ArrayResize(g_put_buffer, 1000);
+    ArrayResize(g_confidence_buffer, 1000);
     
     ArrayResize(g_daily_profits, 365);
-    ArrayResize(g_operation_results, MAX_SIGNALS_PER_DAY);
-    ArrayResize(g_operation_times, MAX_SIGNALS_PER_DAY);
-    ArrayResize(g_operation_patterns, MAX_SIGNALS_PER_DAY);
+    ArrayResize(g_operation_results, 1000);
+    ArrayResize(g_operation_times, 1000);
+    ArrayResize(g_operation_patterns, 1000);
     
     // Inicializar arrays com valores padrão
     ArrayInitialize(g_call_buffer, EMPTY_VALUE);
@@ -261,7 +283,7 @@ bool InitializeGlobalVariables()
  */
 void InitializeMartingaleSimulation()
 {
-    for(int i = 0; i < MAX_MARTINGALE_LEVELS; i++)
+    for(int i = 0; i < 10; i++)
     {
         g_martingale_sim.entry_values[i] = 0.0;
         g_martingale_sim.total_investment[i] = 0.0;
@@ -312,114 +334,30 @@ void InitializeSuperScanResult()
     g_superscan_result.recommendation_apply = false;
 }
 
-//+------------------------------------------------------------------+
-//| Funções de Atualização de Estatísticas                          |
-//+------------------------------------------------------------------+
-
 /**
- * Atualiza estatísticas globais
+ * Inicializa configuração do Telegram
  */
-void UpdateGlobalStatistics()
+void InitializeTelegramConfig()
 {
-    // Calcular winrate
-    double winrate = 0.0;
-    if(g_total_operations > 0)
-    {
-        winrate = (double)g_total_wins / g_total_operations * 100.0;
-    }
-    
-    // Calcular winrate diário
-    double daily_winrate = 0.0;
-    if(g_daily_operations > 0)
-    {
-        daily_winrate = (double)g_daily_wins / g_daily_operations * 100.0;
-    }
-    
-    // Atualizar saldo atual
-    g_current_balance = g_starting_balance + g_total_profit;
-    
-    // Calcular drawdown atual
-    g_current_drawdown = g_current_balance - g_starting_balance;
-    if(g_current_drawdown < g_max_drawdown_value)
-    {
-        g_max_drawdown_value = g_current_drawdown;
-        g_max_drawdown_percentage = (g_max_drawdown_value / g_starting_balance) * 100.0;
-    }
-    
-    // Atualizar análise de risco
-    UpdateRiskAnalysis();
-    
-    // Atualizar estatísticas diárias
-    UpdateDailyStatistics();
+    g_telegram_config.bot_token = "";
+    g_telegram_config.chat_id = "";
+    g_telegram_config.enabled = false;
+    g_telegram_config.retry_attempts = 3;
+    g_telegram_config.retry_delay_ms = 1000;
+    g_telegram_config.send_signals = true;
+    g_telegram_config.send_results = true;
+    g_telegram_config.send_statistics = false;
 }
 
 /**
- * Atualiza análise de risco
+ * Inicializa templates de mensagem
  */
-void UpdateRiskAnalysis()
+void InitializeMessageTemplates()
 {
-    // Implementação simplificada - pode ser expandida
-    if(g_total_operations > 10)
-    {
-        // Calcular volatilidade baseada nos resultados
-        double sum_squared_deviations = 0.0;
-        double average_result = g_total_profit / g_total_operations;
-        
-        for(int i = 0; i < MathMin(g_total_operations, MAX_SIGNALS_PER_DAY); i++)
-        {
-            double deviation = g_operation_results[i] - average_result;
-            sum_squared_deviations += deviation * deviation;
-        }
-        
-        g_daily_stats.volatility = MathSqrt(sum_squared_deviations / g_total_operations);
-        
-        // Calcular Sharpe Ratio simplificado
-        if(g_daily_stats.volatility > 0)
-        {
-            g_daily_stats.sharpe_ratio = average_result / g_daily_stats.volatility;
-        }
-    }
-}
-
-/**
- * Atualiza estatísticas diárias
- */
-void UpdateDailyStatistics()
-{
-    // Calcular recovery factor
-    if(g_max_drawdown_value < 0)
-    {
-        g_daily_stats.recovery_factor = g_total_profit / MathAbs(g_max_drawdown_value);
-    }
-    
-    // Calcular Calmar Ratio
-    if(g_max_drawdown_percentage < 0)
-    {
-        double annual_return = g_total_profit; // Simplificado
-        g_daily_stats.calmar_ratio = annual_return / MathAbs(g_max_drawdown_percentage);
-    }
-    
-    // Atualizar valores de drawdown
-    g_daily_stats.max_drawdown_value = g_max_drawdown_value;
-    g_daily_stats.max_drawdown_percentage = g_max_drawdown_percentage;
-}
-
-/**
- * Reseta estatísticas diárias
- */
-void ResetDailyStatistics()
-{
-    g_daily_operations = 0;
-    g_daily_wins = 0;
-    g_daily_losses = 0;
-    g_daily_profit = 0.0;
-    g_current_martingale_level = 0;
-    g_martingale_sequence_active = false;
-    
-    // Limpar arrays diários
-    ArrayInitialize(g_operation_results, 0.0);
-    ArrayInitialize(g_operation_times, 0);
-    ArrayInitialize(g_operation_patterns, PATTERN_NONE);
+    g_message_templates.signal_template = "🎯 SINAL DETECTADO\n📊 Padrão: {PATTERN}\n🎲 Direção: {DIRECTION}\n💰 Valor: {VALUE}\n📈 Confiança: {CONFIDENCE}%";
+    g_message_templates.result_template = "📊 RESULTADO\n{RESULT_ICON} {RESULT}\n💰 Lucro: {PROFIT}\n💳 Saldo: {BALANCE}";
+    g_message_templates.statistics_template = "📈 ESTATÍSTICAS\n🎯 Operações: {OPERATIONS}\n✅ Vitórias: {WINS}\n❌ Perdas: {LOSSES}\n📊 WinRate: {WINRATE}%";
+    g_message_templates.error_template = "⚠️ ERRO\n{ERROR_MESSAGE}";
 }
 
 /**

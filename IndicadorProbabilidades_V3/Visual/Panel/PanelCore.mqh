@@ -1,845 +1,531 @@
 //+------------------------------------------------------------------+
 //|                                    Visual/Panel/PanelCore.mqh |
 //|                                    Indicador de Probabilidades V3 |
-//|                                Sistema de Painel Visual Core |
+//|                                Sistema de Painel Visual |
 //+------------------------------------------------------------------+
 
 #ifndef VISUAL_PANEL_CORE_MQH
 #define VISUAL_PANEL_CORE_MQH
 
 #include "../../Core/Types.mqh"
-#include "../../Core/Defines.mqh"
 #include "../../Core/Globals.mqh"
-#include "../../Analysis/Financial/FinancialCore.mqh"
 
 //+------------------------------------------------------------------+
-//| Estruturas do Painel Visual                                     |
+//| Constantes do Painel                                            |
 //+------------------------------------------------------------------+
-
-/**
- * Estrutura de configuração do painel
- */
-struct PanelConfiguration
-{
-    bool enabled;                      // Painel habilitado
-    PanelPosition position;            // Posição do painel
-    int offset_x;                      // Offset horizontal
-    int offset_y;                      // Offset vertical
-    int width;                         // Largura do painel
-    int height;                        // Altura do painel
-    color background_color;            // Cor de fundo
-    color border_color;                // Cor da borda
-    color text_color;                  // Cor do texto
-    color header_color;                // Cor do cabeçalho
-    color positive_color;              // Cor para valores positivos
-    color negative_color;              // Cor para valores negativos
-    color neutral_color;               // Cor neutra
-    int font_size;                     // Tamanho da fonte
-    string font_name;                  // Nome da fonte
-    bool show_balance;                 // Mostrar saldo
-    bool show_operations;              // Mostrar operações
-    bool show_winrate;                 // Mostrar winrate
-    bool show_martingale;              // Mostrar martingale
-    bool show_patterns;                // Mostrar padrões
-    bool show_filters;                 // Mostrar filtros
-    bool show_notifications;           // Mostrar notificações
-    bool show_performance;             // Mostrar performance
-    bool show_risk;                    // Mostrar risco
-    bool auto_resize;                  // Redimensionar automaticamente
-    int update_interval_ms;            // Intervalo de atualização
-    bool enable_animations;            // Habilitar animações
-    double transparency;               // Transparência (0-1)
-};
-
-/**
- * Estrutura de elemento do painel
- */
-struct PanelElement
-{
-    string name;                       // Nome do elemento
-    ElementType type;                  // Tipo do elemento
-    int x;                             // Posição X
-    int y;                             // Posição Y
-    int width;                         // Largura
-    int height;                        // Altura
-    string text;                       // Texto
-    color text_color;                  // Cor do texto
-    color background_color;            // Cor de fundo
-    int font_size;                     // Tamanho da fonte
-    bool visible;                      // Visível
-    bool clickable;                    // Clicável
-    string tooltip;                    // Tooltip
-    datetime last_update;              // Última atualização
-};
-
-/**
- * Estrutura de seção do painel
- */
-struct PanelSection
-{
-    string title;                      // Título da seção
-    int start_y;                       // Y inicial
-    int height;                        // Altura da seção
-    bool collapsed;                    // Seção colapsada
-    bool visible;                      // Seção visível
-    PanelElement elements[];           // Elementos da seção
-};
+#define PANEL_WIDTH 280
+#define PANEL_HEIGHT 400
+#define PANEL_MARGIN 10
+#define LINE_HEIGHT 18
+#define FONT_SIZE 9
+#define FONT_NAME "Arial"
 
 //+------------------------------------------------------------------+
-//| Variáveis Globais do Painel                                     |
+//| Cores do Painel                                                 |
 //+------------------------------------------------------------------+
-PanelConfiguration g_panel_config;    // Configuração do painel
-PanelSection g_panel_sections[];      // Seções do painel
-datetime g_last_panel_update = 0;     // Última atualização
-bool g_panel_needs_redraw = true;     // Precisa redesenhar
-int g_panel_total_height = 0;         // Altura total calculada
-string g_panel_prefix = "ProbV3_Panel_"; // Prefixo dos objetos
-
-// Índices das seções
-int g_section_header = 0;
-int g_section_balance = 1;
-int g_section_operations = 2;
-int g_section_martingale = 3;
-int g_section_patterns = 4;
-int g_section_filters = 5;
-int g_section_notifications = 6;
-int g_section_performance = 7;
-int g_section_risk = 8;
-int g_section_controls = 9;
+#define PANEL_BG_COLOR clrDarkSlateGray
+#define PANEL_BORDER_COLOR clrSilver
+#define PANEL_TEXT_COLOR clrWhite
+#define PANEL_TITLE_COLOR clrGold
+#define PANEL_POSITIVE_COLOR clrLimeGreen
+#define PANEL_NEGATIVE_COLOR clrRed
+#define PANEL_NEUTRAL_COLOR clrSilver
 
 //+------------------------------------------------------------------+
 //| Funções de Inicialização do Painel                              |
 //+------------------------------------------------------------------+
 
 /**
- * Inicializa o sistema de painel visual
+ * Inicializa o painel visual
  * @return true se inicializado com sucesso
  */
 bool InitializePanel()
 {
-    // Carrega configuração
-    LoadPanelConfiguration();
-    
-    // Verifica se está habilitado
-    if(!g_panel_config.enabled)
+    if(!g_config.visual.show_panel)
     {
-        Print("Painel Visual: Desabilitado");
-        return true;
+        return true; // Não habilitado, mas não é erro
     }
     
-    // Remove objetos existentes
-    RemoveAllPanelObjects();
+    // Limpar objetos existentes
+    CleanupPanelObjects();
     
-    // Inicializa seções
-    InitializePanelSections();
+    // Calcular posição do painel
+    int panel_x, panel_y;
+    CalculatePanelPosition(panel_x, panel_y);
     
-    // Calcula layout
-    CalculatePanelLayout();
+    // Criar fundo do painel
+    if(!CreatePanelBackground(panel_x, panel_y))
+    {
+        Print("ERRO: Falha ao criar fundo do painel");
+        return false;
+    }
     
-    // Cria elementos visuais
-    CreatePanelElements();
-    
-    // Primeira atualização
-    UpdatePanelData();
+    // Criar elementos do painel
+    if(!CreatePanelElements(panel_x, panel_y))
+    {
+        Print("ERRO: Falha ao criar elementos do painel");
+        return false;
+    }
     
     g_panel_initialized = true;
-    Print("Painel Visual: Inicializado com sucesso");
+    g_last_panel_update = TimeCurrent();
     
+    Print("Painel visual inicializado com sucesso");
     return true;
 }
 
 /**
- * Carrega configuração do painel
+ * Calcula posição do painel baseado na configuração
  */
-void LoadPanelConfiguration()
-{
-    g_panel_config.enabled = g_config.visual.show_panel;
-    g_panel_config.position = g_config.visual.panel_position;
-    g_panel_config.offset_x = g_config.visual.panel_offset_x;
-    g_panel_config.offset_y = g_config.visual.panel_offset_y;
-    g_panel_config.width = 280;
-    g_panel_config.height = 600;
-    g_panel_config.background_color = g_config.visual.panel_background_color;
-    g_panel_config.border_color = g_config.visual.panel_border_color;
-    g_panel_config.text_color = g_config.visual.panel_text_color;
-    g_panel_config.header_color = clrDodgerBlue;
-    g_panel_config.positive_color = g_config.visual.call_color;
-    g_panel_config.negative_color = g_config.visual.put_color;
-    g_panel_config.neutral_color = clrGray;
-    g_panel_config.font_size = 8;
-    g_panel_config.font_name = "Arial";
-    g_panel_config.show_balance = true;
-    g_panel_config.show_operations = true;
-    g_panel_config.show_winrate = true;
-    g_panel_config.show_martingale = true;
-    g_panel_config.show_patterns = true;
-    g_panel_config.show_filters = true;
-    g_panel_config.show_notifications = true;
-    g_panel_config.show_performance = true;
-    g_panel_config.show_risk = true;
-    g_panel_config.auto_resize = true;
-    g_panel_config.update_interval_ms = 1000;
-    g_panel_config.enable_animations = false;
-    g_panel_config.transparency = 0.9;
-}
-
-/**
- * Inicializa seções do painel
- */
-void InitializePanelSections()
-{
-    ArrayResize(g_panel_sections, 10);
-    
-    // Seção Header
-    g_panel_sections[g_section_header].title = "INDICADOR PROBABILIDADES V3";
-    g_panel_sections[g_section_header].visible = true;
-    g_panel_sections[g_section_header].collapsed = false;
-    
-    // Seção Balance
-    g_panel_sections[g_section_balance].title = "SALDO E FINANCEIRO";
-    g_panel_sections[g_section_balance].visible = g_panel_config.show_balance;
-    g_panel_sections[g_section_balance].collapsed = false;
-    
-    // Seção Operations
-    g_panel_sections[g_section_operations].title = "OPERAÇÕES HOJE";
-    g_panel_sections[g_section_operations].visible = g_panel_config.show_operations;
-    g_panel_sections[g_section_operations].collapsed = false;
-    
-    // Seção Martingale
-    g_panel_sections[g_section_martingale].title = "MARTINGALE";
-    g_panel_sections[g_section_martingale].visible = g_panel_config.show_martingale;
-    g_panel_sections[g_section_martingale].collapsed = false;
-    
-    // Seção Patterns
-    g_panel_sections[g_section_patterns].title = "PADRÕES";
-    g_panel_sections[g_section_patterns].visible = g_panel_config.show_patterns;
-    g_panel_sections[g_section_patterns].collapsed = false;
-    
-    // Seção Filters
-    g_panel_sections[g_section_filters].title = "FILTROS";
-    g_panel_sections[g_section_filters].visible = g_panel_config.show_filters;
-    g_panel_sections[g_section_filters].collapsed = false;
-    
-    // Seção Notifications
-    g_panel_sections[g_section_notifications].title = "NOTIFICAÇÕES";
-    g_panel_sections[g_section_notifications].visible = g_panel_config.show_notifications;
-    g_panel_sections[g_section_notifications].collapsed = false;
-    
-    // Seção Performance
-    g_panel_sections[g_section_performance].title = "PERFORMANCE";
-    g_panel_sections[g_section_performance].visible = g_panel_config.show_performance;
-    g_panel_sections[g_section_performance].collapsed = false;
-    
-    // Seção Risk
-    g_panel_sections[g_section_risk].title = "ANÁLISE DE RISCO";
-    g_panel_sections[g_section_risk].visible = g_panel_config.show_risk;
-    g_panel_sections[g_section_risk].collapsed = false;
-    
-    // Seção Controls
-    g_panel_sections[g_section_controls].title = "CONTROLES";
-    g_panel_sections[g_section_controls].visible = true;
-    g_panel_sections[g_section_controls].collapsed = false;
-}
-
-/**
- * Calcula layout do painel
- */
-void CalculatePanelLayout()
-{
-    int current_y = 10;
-    int section_spacing = 5;
-    int element_height = 15;
-    int header_height = 20;
-    
-    for(int i = 0; i < ArraySize(g_panel_sections); i++)
-    {
-        if(!g_panel_sections[i].visible)
-        {
-            continue;
-        }
-        
-        g_panel_sections[i].start_y = current_y;
-        
-        // Altura do cabeçalho da seção
-        current_y += header_height;
-        
-        if(!g_panel_sections[i].collapsed)
-        {
-            // Calcula altura baseada no conteúdo
-            int section_elements = GetSectionElementCount(i);
-            g_panel_sections[i].height = header_height + (section_elements * element_height);
-            current_y += (section_elements * element_height);
-        }
-        else
-        {
-            g_panel_sections[i].height = header_height;
-        }
-        
-        current_y += section_spacing;
-    }
-    
-    g_panel_total_height = current_y + 10;
-    
-    // Ajusta altura do painel se auto-resize estiver habilitado
-    if(g_panel_config.auto_resize)
-    {
-        g_panel_config.height = g_panel_total_height;
-    }
-}
-
-/**
- * Obtém número de elementos de uma seção
- * @param section_index Índice da seção
- * @return Número de elementos
- */
-int GetSectionElementCount(int section_index)
-{
-    switch(section_index)
-    {
-        case 0: return 3; // Header: Título, Status, Tempo
-        case 1: return 6; // Balance: Saldo Atual, Inicial, Lucro, ROI, Stop Loss, Stop Win
-        case 2: return 5; // Operations: Total, Vitórias, Perdas, WinRate, Lucro Diário
-        case 3: return 4; // Martingale: Nível, Próximo Valor, Investimento Total, Risco
-        case 4: return 3; // Patterns: Ativo, Confiança, Último Sinal
-        case 5: return 4; // Filters: ATR, Bollinger, Tendência, Status
-        case 6: return 3; // Notifications: Telegram, MX2, Último Envio
-        case 7: return 5; // Performance: Sharpe, Volatilidade, Max DD, Recovery, Calmar
-        case 8: return 4; // Risk: VaR 95%, VaR 99%, Expected Shortfall, Beta
-        case 9: return 4; // Controls: SuperScan, Reset, Pause, Config
-        default: return 0;
-    }
-}
-
-/**
- * Cria elementos visuais do painel
- */
-void CreatePanelElements()
-{
-    // Calcula posição base do painel
-    int base_x, base_y;
-    CalculatePanelPosition(base_x, base_y);
-    
-    // Cria fundo do painel
-    CreatePanelBackground(base_x, base_y);
-    
-    // Cria seções
-    for(int i = 0; i < ArraySize(g_panel_sections); i++)
-    {
-        if(g_panel_sections[i].visible)
-        {
-            CreateSectionElements(i, base_x, base_y);
-        }
-    }
-}
-
-/**
- * Calcula posição do painel na tela
- * @param base_x Posição X calculada
- * @param base_y Posição Y calculada
- */
-void CalculatePanelPosition(int &base_x, int &base_y)
+void CalculatePanelPosition(int &x, int &y)
 {
     int chart_width = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
     int chart_height = (int)ChartGetInteger(0, CHART_HEIGHT_IN_PIXELS);
     
-    switch(g_panel_config.position)
+    switch(g_config.visual.panel_position)
     {
         case PANEL_TOP_LEFT:
-            base_x = g_panel_config.offset_x;
-            base_y = g_panel_config.offset_y;
+            x = PANEL_MARGIN + g_config.visual.panel_offset_x;
+            y = PANEL_MARGIN + g_config.visual.panel_offset_y;
             break;
             
         case PANEL_TOP_RIGHT:
-            base_x = chart_width - g_panel_config.width - g_panel_config.offset_x;
-            base_y = g_panel_config.offset_y;
+            x = chart_width - PANEL_WIDTH - PANEL_MARGIN + g_config.visual.panel_offset_x;
+            y = PANEL_MARGIN + g_config.visual.panel_offset_y;
             break;
             
         case PANEL_BOTTOM_LEFT:
-            base_x = g_panel_config.offset_x;
-            base_y = chart_height - g_panel_config.height - g_panel_config.offset_y;
+            x = PANEL_MARGIN + g_config.visual.panel_offset_x;
+            y = chart_height - PANEL_HEIGHT - PANEL_MARGIN + g_config.visual.panel_offset_y;
             break;
             
         case PANEL_BOTTOM_RIGHT:
-            base_x = chart_width - g_panel_config.width - g_panel_config.offset_x;
-            base_y = chart_height - g_panel_config.height - g_panel_config.offset_y;
-            break;
-            
-        case PANEL_CENTER:
-            base_x = (chart_width - g_panel_config.width) / 2 + g_panel_config.offset_x;
-            base_y = (chart_height - g_panel_config.height) / 2 + g_panel_config.offset_y;
+            x = chart_width - PANEL_WIDTH - PANEL_MARGIN + g_config.visual.panel_offset_x;
+            y = chart_height - PANEL_HEIGHT - PANEL_MARGIN + g_config.visual.panel_offset_y;
             break;
             
         default:
-            base_x = g_panel_config.offset_x;
-            base_y = g_panel_config.offset_y;
+            x = PANEL_MARGIN;
+            y = PANEL_MARGIN;
             break;
     }
 }
 
 /**
  * Cria fundo do painel
- * @param base_x Posição X base
- * @param base_y Posição Y base
  */
-void CreatePanelBackground(int base_x, int base_y)
+bool CreatePanelBackground(int x, int y)
 {
-    string bg_name = g_panel_prefix + "Background";
+    string obj_name = "ProbPanel_Background";
     
-    // Remove objeto existente
-    ObjectDelete(0, bg_name);
+    if(!ObjectCreate(0, obj_name, OBJ_RECTANGLE_LABEL, 0, 0, 0))
+    {
+        return false;
+    }
     
-    // Cria retângulo de fundo
-    ObjectCreate(0, bg_name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
-    ObjectSetInteger(0, bg_name, OBJPROP_XDISTANCE, base_x);
-    ObjectSetInteger(0, bg_name, OBJPROP_YDISTANCE, base_y);
-    ObjectSetInteger(0, bg_name, OBJPROP_XSIZE, g_panel_config.width);
-    ObjectSetInteger(0, bg_name, OBJPROP_YSIZE, g_panel_config.height);
-    ObjectSetInteger(0, bg_name, OBJPROP_BGCOLOR, g_panel_config.background_color);
-    ObjectSetInteger(0, bg_name, OBJPROP_BORDER_COLOR, g_panel_config.border_color);
-    ObjectSetInteger(0, bg_name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
-    ObjectSetInteger(0, bg_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-    ObjectSetInteger(0, bg_name, OBJPROP_BACK, false);
-    ObjectSetInteger(0, bg_name, OBJPROP_SELECTABLE, false);
-    ObjectSetInteger(0, bg_name, OBJPROP_HIDDEN, true);
+    ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, x);
+    ObjectSetInteger(0, obj_name, OBJPROP_YDISTANCE, y);
+    ObjectSetInteger(0, obj_name, OBJPROP_XSIZE, PANEL_WIDTH);
+    ObjectSetInteger(0, obj_name, OBJPROP_YSIZE, PANEL_HEIGHT);
+    ObjectSetInteger(0, obj_name, OBJPROP_BGCOLOR, PANEL_BG_COLOR);
+    ObjectSetInteger(0, obj_name, OBJPROP_BORDER_COLOR, PANEL_BORDER_COLOR);
+    ObjectSetInteger(0, obj_name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+    ObjectSetInteger(0, obj_name, OBJPROP_WIDTH, 1);
+    ObjectSetInteger(0, obj_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+    ObjectSetInteger(0, obj_name, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+    ObjectSetInteger(0, obj_name, OBJPROP_BACK, false);
+    ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
+    ObjectSetInteger(0, obj_name, OBJPROP_SELECTED, false);
+    ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, true);
+    
+    AddPanelObject(obj_name);
+    return true;
 }
 
 /**
- * Cria elementos de uma seção
- * @param section_index Índice da seção
- * @param base_x Posição X base
- * @param base_y Posição Y base
+ * Cria elementos do painel
  */
-void CreateSectionElements(int section_index, int base_x, int base_y)
+bool CreatePanelElements(int x, int y)
 {
-    PanelSection &section = g_panel_sections[section_index];
+    int current_y = y + 10;
     
-    // Cria cabeçalho da seção
-    CreateSectionHeader(section_index, base_x, base_y);
+    // Título
+    if(!CreatePanelLabel("ProbPanel_Title", "INDICADOR DE PROBABILIDADES V3", x + 10, current_y, PANEL_TITLE_COLOR, 10, true))
+        return false;
+    current_y += 25;
     
-    if(!section.collapsed)
+    // Linha separadora
+    if(!CreatePanelLine("ProbPanel_Separator1", x + 10, current_y, x + PANEL_WIDTH - 10, current_y))
+        return false;
+    current_y += 15;
+    
+    // Seção: Sistema
+    if(!CreatePanelLabel("ProbPanel_SystemTitle", "SISTEMA", x + 10, current_y, PANEL_TITLE_COLOR, FONT_SIZE, true))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_Status", "Status: Inicializando...", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_Pattern", "Padrão: MHI1", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_LastSignal", "Último Sinal: Nenhum", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    current_y += 20;
+    
+    // Seção: Financeiro (SALDO SEMPRE VISÍVEL)
+    if(!CreatePanelLabel("ProbPanel_FinancialTitle", "FINANCEIRO", x + 10, current_y, PANEL_TITLE_COLOR, FONT_SIZE, true))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_Balance", "Saldo: R$ 1.000,00", x + 15, current_y, PANEL_POSITIVE_COLOR, FONT_SIZE, true))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_Profit", "Lucro: R$ 0,00", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_EntryValue", "Valor Entrada: R$ 10,00", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_Martingale", "Martingale: Nível 0", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    current_y += 20;
+    
+    // Seção: Operações
+    if(!CreatePanelLabel("ProbPanel_OperationsTitle", "OPERAÇÕES", x + 10, current_y, PANEL_TITLE_COLOR, FONT_SIZE, true))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_TotalOps", "Total: 0", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_Wins", "Vitórias: 0", x + 15, current_y, PANEL_POSITIVE_COLOR))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_Losses", "Perdas: 0", x + 15, current_y, PANEL_NEGATIVE_COLOR))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_Winrate", "WinRate: 0.0%", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    current_y += 20;
+    
+    // Seção: Análise de Risco
+    if(!CreatePanelLabel("ProbPanel_RiskTitle", "ANÁLISE DE RISCO", x + 10, current_y, PANEL_TITLE_COLOR, FONT_SIZE, true))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_Drawdown", "Max Drawdown: R$ 0,00", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_Sharpe", "Sharpe Ratio: 0.00", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_Volatility", "Volatilidade: 0.00%", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    current_y += 20;
+    
+    // Seção: Notificações
+    if(!CreatePanelLabel("ProbPanel_NotificationsTitle", "NOTIFICAÇÕES", x + 10, current_y, PANEL_TITLE_COLOR, FONT_SIZE, true))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_Telegram", "Telegram: Desabilitado", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    current_y += LINE_HEIGHT;
+    
+    if(!CreatePanelLabel("ProbPanel_MX2", "MX2: Desabilitado", x + 15, current_y, PANEL_TEXT_COLOR))
+        return false;
+    
+    return true;
+}
+
+/**
+ * Cria label do painel
+ */
+bool CreatePanelLabel(string name, string text, int x, int y, color clr, int font_size = FONT_SIZE, bool bold = false)
+{
+    if(!ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0))
     {
-        // Cria elementos específicos da seção
-        switch(section_index)
+        return false;
+    }
+    
+    ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
+    ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
+    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+    ObjectSetInteger(0, name, OBJPROP_FONTSIZE, font_size);
+    ObjectSetString(0, name, OBJPROP_FONT, bold ? "Arial Bold" : FONT_NAME);
+    ObjectSetString(0, name, OBJPROP_TEXT, text);
+    ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+    ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+    ObjectSetInteger(0, name, OBJPROP_BACK, false);
+    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+    ObjectSetInteger(0, name, OBJPROP_SELECTED, false);
+    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+    
+    AddPanelObject(name);
+    return true;
+}
+
+/**
+ * Cria linha do painel
+ */
+bool CreatePanelLine(string name, int x1, int y1, int x2, int y2)
+{
+    if(!ObjectCreate(0, name, OBJ_HLINE, 0, 0))
+    {
+        // Se não conseguir criar HLINE, criar como TREND
+        if(!ObjectCreate(0, name, OBJ_TREND, 0, 0, 0))
         {
-            case 0: CreateHeaderElements(base_x, base_y); break;
-            case 1: CreateBalanceElements(base_x, base_y); break;
-            case 2: CreateOperationsElements(base_x, base_y); break;
-            case 3: CreateMartingaleElements(base_x, base_y); break;
-            case 4: CreatePatternsElements(base_x, base_y); break;
-            case 5: CreateFiltersElements(base_x, base_y); break;
-            case 6: CreateNotificationsElements(base_x, base_y); break;
-            case 7: CreatePerformanceElements(base_x, base_y); break;
-            case 8: CreateRiskElements(base_x, base_y); break;
-            case 9: CreateControlsElements(base_x, base_y); break;
+            return false;
         }
-    }
-}
-
-/**
- * Cria cabeçalho de uma seção
- * @param section_index Índice da seção
- * @param base_x Posição X base
- * @param base_y Posição Y base
- */
-void CreateSectionHeader(int section_index, int base_x, int base_y)
-{
-    PanelSection &section = g_panel_sections[section_index];
-    string header_name = g_panel_prefix + "Header_" + IntegerToString(section_index);
-    
-    // Remove objeto existente
-    ObjectDelete(0, header_name);
-    
-    // Cria label do cabeçalho
-    ObjectCreate(0, header_name, OBJ_LABEL, 0, 0, 0);
-    ObjectSetInteger(0, header_name, OBJPROP_XDISTANCE, base_x + 5);
-    ObjectSetInteger(0, header_name, OBJPROP_YDISTANCE, base_y + section.start_y);
-    ObjectSetString(0, header_name, OBJPROP_TEXT, section.title);
-    ObjectSetString(0, header_name, OBJPROP_FONT, g_panel_config.font_name);
-    ObjectSetInteger(0, header_name, OBJPROP_FONTSIZE, g_panel_config.font_size + 1);
-    ObjectSetInteger(0, header_name, OBJPROP_COLOR, g_panel_config.header_color);
-    ObjectSetInteger(0, header_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-    ObjectSetInteger(0, header_name, OBJPROP_SELECTABLE, false);
-    ObjectSetInteger(0, header_name, OBJPROP_HIDDEN, true);
-}
-
-/**
- * Cria elementos da seção Header
- * @param base_x Posição X base
- * @param base_y Posição Y base
- */
-void CreateHeaderElements(int base_x, int base_y)
-{
-    int start_y = g_panel_sections[g_section_header].start_y + 20;
-    
-    CreateLabel("Status", "Status: Operacional", base_x + 10, base_y + start_y, g_panel_config.positive_color);
-    CreateLabel("Version", "Versão: " + INDICATOR_VERSION, base_x + 10, base_y + start_y + 15, g_panel_config.text_color);
-    CreateLabel("Time", "Tempo: " + TimeToString(TimeCurrent(), TIME_SECONDS), base_x + 10, base_y + start_y + 30, g_panel_config.text_color);
-}
-
-/**
- * Cria elementos da seção Balance
- * @param base_x Posição X base
- * @param base_y Posição Y base
- */
-void CreateBalanceElements(int base_x, int base_y)
-{
-    int start_y = g_panel_sections[g_section_balance].start_y + 20;
-    
-    CreateLabel("BalanceCurrent", "Saldo Atual: " + FormatCurrency(g_current_balance), base_x + 10, base_y + start_y, g_panel_config.text_color);
-    CreateLabel("BalanceInitial", "Saldo Inicial: " + FormatCurrency(g_starting_balance), base_x + 10, base_y + start_y + 15, g_panel_config.text_color);
-    
-    double profit = g_current_balance - g_starting_balance;
-    color profit_color = profit >= 0 ? g_panel_config.positive_color : g_panel_config.negative_color;
-    CreateLabel("Profit", "Lucro/Prejuízo: " + FormatCurrency(profit), base_x + 10, base_y + start_y + 30, profit_color);
-    
-    double roi = g_starting_balance > 0 ? (profit / g_starting_balance) * 100.0 : 0.0;
-    CreateLabel("ROI", "ROI: " + DoubleToString(roi, 2) + "%", base_x + 10, base_y + start_y + 45, profit_color);
-    
-    string stop_loss_text = g_stop_loss_active ? "ATIVO" : "Inativo";
-    color stop_loss_color = g_stop_loss_active ? g_panel_config.negative_color : g_panel_config.neutral_color;
-    CreateLabel("StopLoss", "Stop Loss: " + stop_loss_text, base_x + 10, base_y + start_y + 60, stop_loss_color);
-    
-    string stop_win_text = g_stop_win_active ? "ATIVO" : "Inativo";
-    color stop_win_color = g_stop_win_active ? g_panel_config.positive_color : g_panel_config.neutral_color;
-    CreateLabel("StopWin", "Stop Win: " + stop_win_text, base_x + 10, base_y + start_y + 75, stop_win_color);
-}
-
-/**
- * Cria elementos da seção Operations
- * @param base_x Posição X base
- * @param base_y Posição Y base
- */
-void CreateOperationsElements(int base_x, int base_y)
-{
-    int start_y = g_panel_sections[g_section_operations].start_y + 20;
-    
-    CreateLabel("OpTotal", "Total: " + IntegerToString(g_total_operations_today), base_x + 10, base_y + start_y, g_panel_config.text_color);
-    CreateLabel("OpWins", "Vitórias: " + IntegerToString(g_total_wins_today), base_x + 10, base_y + start_y + 15, g_panel_config.positive_color);
-    CreateLabel("OpLosses", "Perdas: " + IntegerToString(g_total_losses_today), base_x + 10, base_y + start_y + 30, g_panel_config.negative_color);
-    
-    color winrate_color = g_daily_winrate >= 60.0 ? g_panel_config.positive_color : 
-                         g_daily_winrate >= 40.0 ? g_panel_config.neutral_color : g_panel_config.negative_color;
-    CreateLabel("WinRate", "WinRate: " + DoubleToString(g_daily_winrate, 1) + "%", base_x + 10, base_y + start_y + 45, winrate_color);
-    
-    color daily_profit_color = g_daily_profit >= 0 ? g_panel_config.positive_color : g_panel_config.negative_color;
-    CreateLabel("DailyProfit", "Lucro Diário: " + FormatCurrency(g_daily_profit), base_x + 10, base_y + start_y + 60, daily_profit_color);
-}
-
-/**
- * Cria elementos da seção Martingale
- * @param base_x Posição X base
- * @param base_y Posição Y base
- */
-void CreateMartingaleElements(int base_x, int base_y)
-{
-    int start_y = g_panel_sections[g_section_martingale].start_y + 20;
-    
-    color level_color = g_current_martingale_level == 0 ? g_panel_config.positive_color : 
-                       g_current_martingale_level <= 2 ? g_panel_config.neutral_color : g_panel_config.negative_color;
-    CreateLabel("MartLevel", "Nível: " + IntegerToString(g_current_martingale_level), base_x + 10, base_y + start_y, level_color);
-    
-    double next_value = CalculateEntryValue(g_current_martingale_level);
-    CreateLabel("MartNext", "Próximo: " + FormatCurrency(next_value), base_x + 10, base_y + start_y + 15, g_panel_config.text_color);
-    
-    if(g_current_martingale_level < ArraySize(g_martingale_sim.total_investment))
-    {
-        double total_investment = g_martingale_sim.total_investment[g_current_martingale_level];
-        CreateLabel("MartTotal", "Total Inv.: " + FormatCurrency(total_investment), base_x + 10, base_y + start_y + 30, g_panel_config.text_color);
         
-        double risk_percentage = g_martingale_sim.risk_percentage[g_current_martingale_level];
-        color risk_color = risk_percentage <= 5.0 ? g_panel_config.positive_color : 
-                          risk_percentage <= 15.0 ? g_panel_config.neutral_color : g_panel_config.negative_color;
-        CreateLabel("MartRisk", "Risco: " + DoubleToString(risk_percentage, 1) + "%", base_x + 10, base_y + start_y + 45, risk_color);
+        ObjectSetInteger(0, name, OBJPROP_TIME1, 0);
+        ObjectSetInteger(0, name, OBJPROP_TIME2, 0);
+        ObjectSetDouble(0, name, OBJPROP_PRICE1, 0);
+        ObjectSetDouble(0, name, OBJPROP_PRICE2, 0);
     }
+    
+    ObjectSetInteger(0, name, OBJPROP_COLOR, PANEL_BORDER_COLOR);
+    ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
+    ObjectSetInteger(0, name, OBJPROP_BACK, false);
+    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+    ObjectSetInteger(0, name, OBJPROP_SELECTED, false);
+    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+    
+    AddPanelObject(name);
+    return true;
 }
 
 /**
- * Cria elementos da seção Patterns
- * @param base_x Posição X base
- * @param base_y Posição Y base
+ * Adiciona objeto à lista do painel
  */
-void CreatePatternsElements(int base_x, int base_y)
+void AddPanelObject(string name)
 {
-    int start_y = g_panel_sections[g_section_patterns].start_y + 20;
-    
-    CreateLabel("PatternActive", "Ativo: " + PatternTypeToString(g_active_pattern), base_x + 10, base_y + start_y, g_panel_config.text_color);
-    CreateLabel("PatternConf", "Confiança: " + DoubleToString(g_last_signal_confidence, 1) + "%", base_x + 10, base_y + start_y + 15, g_panel_config.text_color);
-    
-    string last_signal_text = g_last_signal_time > 0 ? TimeToString(g_last_signal_time, TIME_SECONDS) : "Nenhum";
-    CreateLabel("PatternLast", "Último: " + last_signal_text, base_x + 10, base_y + start_y + 30, g_panel_config.text_color);
+    ArrayResize(g_panel_objects, g_panel_object_count + 1);
+    g_panel_objects[g_panel_object_count] = name;
+    g_panel_object_count++;
 }
 
 /**
- * Cria elementos da seção Filters
- * @param base_x Posição X base
- * @param base_y Posição Y base
+ * Atualiza painel com dados atuais
  */
-void CreateFiltersElements(int base_x, int base_y)
+void UpdatePanel()
 {
-    int start_y = g_panel_sections[g_section_filters].start_y + 20;
-    
-    CreateLabel("FilterATR", "ATR: " + DoubleToString(g_current_atr, 5), base_x + 10, base_y + start_y, g_panel_config.text_color);
-    
-    string bb_status = g_market_filters.bollinger_bands_active ? "Ativo" : "Inativo";
-    color bb_color = g_market_filters.bollinger_bands_active ? g_panel_config.positive_color : g_panel_config.neutral_color;
-    CreateLabel("FilterBB", "Bollinger: " + bb_status, base_x + 10, base_y + start_y + 15, bb_color);
-    
-    string trend_text = g_market_filters.trend_direction == 1 ? "Alta" : 
-                       g_market_filters.trend_direction == -1 ? "Baixa" : "Lateral";
-    CreateLabel("FilterTrend", "Tendência: " + trend_text, base_x + 10, base_y + start_y + 30, g_panel_config.text_color);
-    
-    string filter_status = g_market_filters.all_filters_passed ? "APROVADO" : "REPROVADO";
-    color filter_color = g_market_filters.all_filters_passed ? g_panel_config.positive_color : g_panel_config.negative_color;
-    CreateLabel("FilterStatus", "Status: " + filter_status, base_x + 10, base_y + start_y + 45, filter_color);
-}
-
-/**
- * Cria elementos da seção Notifications
- * @param base_x Posição X base
- * @param base_y Posição Y base
- */
-void CreateNotificationsElements(int base_x, int base_y)
-{
-    int start_y = g_panel_sections[g_section_notifications].start_y + 20;
-    
-    string telegram_status = IsTelegramOperational() ? "Ativo" : "Inativo";
-    color telegram_color = IsTelegramOperational() ? g_panel_config.positive_color : g_panel_config.negative_color;
-    CreateLabel("NotifTelegram", "Telegram: " + telegram_status, base_x + 10, base_y + start_y, telegram_color);
-    
-    string mx2_status = IsMX2Operational() ? "Ativo" : "Inativo";
-    color mx2_color = IsMX2Operational() ? g_panel_config.positive_color : g_panel_config.negative_color;
-    CreateLabel("NotifMX2", "MX2: " + mx2_status, base_x + 10, base_y + start_y + 15, mx2_color);
-    
-    datetime last_notification = MathMax(g_last_telegram_message_time, g_last_mx2_signal_time);
-    string last_text = last_notification > 0 ? TimeToString(last_notification, TIME_SECONDS) : "Nenhum";
-    CreateLabel("NotifLast", "Último: " + last_text, base_x + 10, base_y + start_y + 30, g_panel_config.text_color);
-}
-
-/**
- * Cria elementos da seção Performance
- * @param base_x Posição X base
- * @param base_y Posição Y base
- */
-void CreatePerformanceElements(int base_x, int base_y)
-{
-    int start_y = g_panel_sections[g_section_performance].start_y + 20;
-    
-    CreateLabel("PerfSharpe", "Sharpe: " + DoubleToString(g_daily_stats.sharpe_ratio, 3), base_x + 10, base_y + start_y, g_panel_config.text_color);
-    CreateLabel("PerfVol", "Volatilidade: " + DoubleToString(g_daily_stats.volatility * 100, 2) + "%", base_x + 10, base_y + start_y + 15, g_panel_config.text_color);
-    CreateLabel("PerfDD", "Max DD: " + DoubleToString(g_daily_stats.max_drawdown_percentage, 2) + "%", base_x + 10, base_y + start_y + 30, g_panel_config.text_color);
-    CreateLabel("PerfRecovery", "Recovery: " + DoubleToString(g_daily_stats.recovery_factor, 2), base_x + 10, base_y + start_y + 45, g_panel_config.text_color);
-    CreateLabel("PerfCalmar", "Calmar: " + DoubleToString(g_daily_stats.calmar_ratio, 3), base_x + 10, base_y + start_y + 60, g_panel_config.text_color);
-}
-
-/**
- * Cria elementos da seção Risk
- * @param base_x Posição X base
- * @param base_y Posição Y base
- */
-void CreateRiskElements(int base_x, int base_y)
-{
-    int start_y = g_panel_sections[g_section_risk].start_y + 20;
-    
-    CreateLabel("RiskVaR95", "VaR 95%: " + FormatCurrency(g_risk_analysis.var_95), base_x + 10, base_y + start_y, g_panel_config.text_color);
-    CreateLabel("RiskVaR99", "VaR 99%: " + FormatCurrency(g_risk_analysis.var_99), base_x + 10, base_y + start_y + 15, g_panel_config.text_color);
-    CreateLabel("RiskES", "Exp. Shortfall: " + FormatCurrency(g_risk_analysis.expected_shortfall), base_x + 10, base_y + start_y + 30, g_panel_config.text_color);
-    CreateLabel("RiskBeta", "Beta: " + DoubleToString(g_risk_analysis.beta, 3), base_x + 10, base_y + start_y + 45, g_panel_config.text_color);
-}
-
-/**
- * Cria elementos da seção Controls
- * @param base_x Posição X base
- * @param base_y Posição Y base
- */
-void CreateControlsElements(int base_x, int base_y)
-{
-    int start_y = g_panel_sections[g_section_controls].start_y + 20;
-    
-    string superscan_text = g_superscan_running ? "EXECUTANDO" : "Parado";
-    color superscan_color = g_superscan_running ? g_panel_config.positive_color : g_panel_config.neutral_color;
-    CreateLabel("CtrlSuperScan", "SuperScan: " + superscan_text, base_x + 10, base_y + start_y, superscan_color);
-    
-    CreateLabel("CtrlReset", "Reset Diário: Manual", base_x + 10, base_y + start_y + 15, g_panel_config.text_color);
-    
-    string pause_text = g_system_paused ? "PAUSADO" : "Ativo";
-    color pause_color = g_system_paused ? g_panel_config.negative_color : g_panel_config.positive_color;
-    CreateLabel("CtrlPause", "Sistema: " + pause_text, base_x + 10, base_y + start_y + 30, pause_color);
-    
-    CreateLabel("CtrlConfig", "Config: OK", base_x + 10, base_y + start_y + 45, g_panel_config.positive_color);
-}
-
-/**
- * Cria um label
- * @param name Nome do objeto
- * @param text Texto do label
- * @param x Posição X
- * @param y Posição Y
- * @param color Cor do texto
- */
-void CreateLabel(string name, string text, int x, int y, color text_color)
-{
-    string full_name = g_panel_prefix + name;
-    
-    // Remove objeto existente
-    ObjectDelete(0, full_name);
-    
-    // Cria novo label
-    ObjectCreate(0, full_name, OBJ_LABEL, 0, 0, 0);
-    ObjectSetInteger(0, full_name, OBJPROP_XDISTANCE, x);
-    ObjectSetInteger(0, full_name, OBJPROP_YDISTANCE, y);
-    ObjectSetString(0, full_name, OBJPROP_TEXT, text);
-    ObjectSetString(0, full_name, OBJPROP_FONT, g_panel_config.font_name);
-    ObjectSetInteger(0, full_name, OBJPROP_FONTSIZE, g_panel_config.font_size);
-    ObjectSetInteger(0, full_name, OBJPROP_COLOR, text_color);
-    ObjectSetInteger(0, full_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-    ObjectSetInteger(0, full_name, OBJPROP_SELECTABLE, false);
-    ObjectSetInteger(0, full_name, OBJPROP_HIDDEN, true);
-}
-
-//+------------------------------------------------------------------+
-//| Funções de Atualização do Painel                                |
-//+------------------------------------------------------------------+
-
-/**
- * Atualiza dados do painel
- */
-void UpdatePanelData()
-{
-    if(!g_panel_initialized || !g_panel_config.enabled)
-    {
+    if(!g_panel_initialized || !g_config.visual.show_panel)
         return;
-    }
     
+    // Verificar se precisa atualizar (máximo 1x por segundo)
     datetime current_time = TimeCurrent();
-    
-    // Verifica intervalo de atualização
-    if(current_time - g_last_panel_update < g_panel_config.update_interval_ms / 1000)
-    {
+    if(current_time - g_last_panel_update < 1)
         return;
-    }
     
-    // Atualiza elementos dinâmicos
-    UpdateDynamicElements();
+    // Atualizar seção Sistema
+    UpdateSystemSection();
+    
+    // Atualizar seção Financeiro (SALDO SEMPRE ATUALIZADO)
+    UpdateFinancialSection();
+    
+    // Atualizar seção Operações
+    UpdateOperationsSection();
+    
+    // Atualizar seção Análise de Risco
+    UpdateRiskSection();
+    
+    // Atualizar seção Notificações
+    UpdateNotificationsSection();
     
     g_last_panel_update = current_time;
 }
 
 /**
- * Atualiza elementos dinâmicos
+ * Atualiza seção do sistema
  */
-void UpdateDynamicElements()
+void UpdateSystemSection()
 {
-    // Atualiza tempo
-    UpdateLabel("Time", "Tempo: " + TimeToString(TimeCurrent(), TIME_SECONDS));
+    // Status do sistema
+    string status_text = "Status: ";
+    switch(g_system_state)
+    {
+        case STATE_INITIALIZING: status_text += "Inicializando"; break;
+        case STATE_RUNNING: status_text += "Executando"; break;
+        case STATE_PAUSED: status_text += "Pausado"; break;
+        case STATE_ERROR: status_text += "Erro"; break;
+        case STATE_STOPPED: status_text += "Parado"; break;
+        default: status_text += "Desconhecido"; break;
+    }
+    ObjectSetString(0, "ProbPanel_Status", OBJPROP_TEXT, status_text);
     
-    // Atualiza saldo
-    UpdateLabel("BalanceCurrent", "Saldo Atual: " + FormatCurrency(g_current_balance));
+    // Padrão atual
+    string pattern_text = "Padrão: " + PatternTypeToString(g_current_pattern);
+    ObjectSetString(0, "ProbPanel_Pattern", OBJPROP_TEXT, pattern_text);
     
-    double profit = g_current_balance - g_starting_balance;
-    color profit_color = profit >= 0 ? g_panel_config.positive_color : g_panel_config.negative_color;
-    UpdateLabel("Profit", "Lucro/Prejuízo: " + FormatCurrency(profit), profit_color);
-    
-    double roi = g_starting_balance > 0 ? (profit / g_starting_balance) * 100.0 : 0.0;
-    UpdateLabel("ROI", "ROI: " + DoubleToString(roi, 2) + "%", profit_color);
-    
-    // Atualiza operações
-    UpdateLabel("OpTotal", "Total: " + IntegerToString(g_total_operations_today));
-    UpdateLabel("OpWins", "Vitórias: " + IntegerToString(g_total_wins_today));
-    UpdateLabel("OpLosses", "Perdas: " + IntegerToString(g_total_losses_today));
-    
-    color winrate_color = g_daily_winrate >= 60.0 ? g_panel_config.positive_color : 
-                         g_daily_winrate >= 40.0 ? g_panel_config.neutral_color : g_panel_config.negative_color;
-    UpdateLabel("WinRate", "WinRate: " + DoubleToString(g_daily_winrate, 1) + "%", winrate_color);
-    
-    color daily_profit_color = g_daily_profit >= 0 ? g_panel_config.positive_color : g_panel_config.negative_color;
-    UpdateLabel("DailyProfit", "Lucro Diário: " + FormatCurrency(g_daily_profit), daily_profit_color);
-    
-    // Atualiza martingale
-    color level_color = g_current_martingale_level == 0 ? g_panel_config.positive_color : 
-                       g_current_martingale_level <= 2 ? g_panel_config.neutral_color : g_panel_config.negative_color;
-    UpdateLabel("MartLevel", "Nível: " + IntegerToString(g_current_martingale_level), level_color);
-    
-    double next_value = CalculateEntryValue(g_current_martingale_level);
-    UpdateLabel("MartNext", "Próximo: " + FormatCurrency(next_value));
-    
-    // Atualiza filtros
-    string filter_status = g_market_filters.all_filters_passed ? "APROVADO" : "REPROVADO";
-    color filter_color = g_market_filters.all_filters_passed ? g_panel_config.positive_color : g_panel_config.negative_color;
-    UpdateLabel("FilterStatus", "Status: " + filter_status, filter_color);
-    
-    // Atualiza notificações
-    string telegram_status = IsTelegramOperational() ? "Ativo" : "Inativo";
-    color telegram_color = IsTelegramOperational() ? g_panel_config.positive_color : g_panel_config.negative_color;
-    UpdateLabel("NotifTelegram", "Telegram: " + telegram_status, telegram_color);
-    
-    string mx2_status = IsMX2Operational() ? "Ativo" : "Inativo";
-    color mx2_color = IsMX2Operational() ? g_panel_config.positive_color : g_panel_config.negative_color;
-    UpdateLabel("NotifMX2", "MX2: " + mx2_status, mx2_color);
+    // Último sinal
+    string signal_text = "Último Sinal: ";
+    if(g_last_signal.signal_time > 0)
+    {
+        signal_text += (g_last_signal.is_call ? "CALL" : "PUT");
+        signal_text += " (" + TimeToString(g_last_signal.signal_time, TIME_MINUTES) + ")";
+    }
+    else
+    {
+        signal_text += "Nenhum";
+    }
+    ObjectSetString(0, "ProbPanel_LastSignal", OBJPROP_TEXT, signal_text);
 }
 
 /**
- * Atualiza texto de um label
- * @param name Nome do label
- * @param text Novo texto
- * @param text_color Nova cor (opcional)
+ * Atualiza seção financeiro (SALDO SEMPRE VISÍVEL)
  */
-void UpdateLabel(string name, string text, color text_color = clrNONE)
+void UpdateFinancialSection()
 {
-    string full_name = g_panel_prefix + name;
+    // SALDO - SEMPRE DESTACADO
+    string balance_text = "Saldo: " + FormatCurrency(g_current_balance);
+    ObjectSetString(0, "ProbPanel_Balance", OBJPROP_TEXT, balance_text);
     
-    if(ObjectFind(0, full_name) >= 0)
+    // Cor do saldo baseada no lucro/prejuízo
+    color balance_color = PANEL_POSITIVE_COLOR;
+    if(g_current_balance < g_starting_balance)
     {
-        ObjectSetString(0, full_name, OBJPROP_TEXT, text);
-        
-        if(text_color != clrNONE)
+        balance_color = PANEL_NEGATIVE_COLOR;
+    }
+    ObjectSetInteger(0, "ProbPanel_Balance", OBJPROP_COLOR, balance_color);
+    
+    // Lucro total
+    string profit_text = "Lucro: " + FormatCurrency(g_total_profit);
+    ObjectSetString(0, "ProbPanel_Profit", OBJPROP_TEXT, profit_text);
+    
+    color profit_color = (g_total_profit >= 0) ? PANEL_POSITIVE_COLOR : PANEL_NEGATIVE_COLOR;
+    ObjectSetInteger(0, "ProbPanel_Profit", OBJPROP_COLOR, profit_color);
+    
+    // Valor de entrada atual
+    string entry_text = "Valor Entrada: " + FormatCurrency(g_current_entry_value);
+    ObjectSetString(0, "ProbPanel_EntryValue", OBJPROP_TEXT, entry_text);
+    
+    // Martingale
+    string martingale_text = "Martingale: Nível " + IntegerToString(g_current_martingale_level);
+    if(g_martingale_sequence_active)
+    {
+        martingale_text += " (Ativo)";
+    }
+    ObjectSetString(0, "ProbPanel_Martingale", OBJPROP_TEXT, martingale_text);
+    
+    color martingale_color = (g_current_martingale_level > 0) ? PANEL_NEGATIVE_COLOR : PANEL_TEXT_COLOR;
+    ObjectSetInteger(0, "ProbPanel_Martingale", OBJPROP_COLOR, martingale_color);
+}
+
+/**
+ * Atualiza seção de operações
+ */
+void UpdateOperationsSection()
+{
+    // Total de operações
+    string total_text = "Total: " + IntegerToString(g_total_operations);
+    ObjectSetString(0, "ProbPanel_TotalOps", OBJPROP_TEXT, total_text);
+    
+    // Vitórias
+    string wins_text = "Vitórias: " + IntegerToString(g_total_wins);
+    ObjectSetString(0, "ProbPanel_Wins", OBJPROP_TEXT, wins_text);
+    
+    // Perdas
+    string losses_text = "Perdas: " + IntegerToString(g_total_losses);
+    ObjectSetString(0, "ProbPanel_Losses", OBJPROP_TEXT, losses_text);
+    
+    // WinRate
+    double winrate = 0.0;
+    if(g_total_operations > 0)
+    {
+        winrate = ((double)g_total_wins / g_total_operations) * 100.0;
+    }
+    
+    string winrate_text = "WinRate: " + FormatPercentage(winrate);
+    ObjectSetString(0, "ProbPanel_Winrate", OBJPROP_TEXT, winrate_text);
+    
+    color winrate_color = PANEL_TEXT_COLOR;
+    if(winrate >= 60.0)
+        winrate_color = PANEL_POSITIVE_COLOR;
+    else if(winrate < 50.0)
+        winrate_color = PANEL_NEGATIVE_COLOR;
+    
+    ObjectSetInteger(0, "ProbPanel_Winrate", OBJPROP_COLOR, winrate_color);
+}
+
+/**
+ * Atualiza seção de análise de risco
+ */
+void UpdateRiskSection()
+{
+    // Max Drawdown
+    string drawdown_text = "Max Drawdown: " + FormatCurrency(g_max_drawdown_value);
+    ObjectSetString(0, "ProbPanel_Drawdown", OBJPROP_TEXT, drawdown_text);
+    
+    color drawdown_color = (g_max_drawdown_value < 0) ? PANEL_NEGATIVE_COLOR : PANEL_TEXT_COLOR;
+    ObjectSetInteger(0, "ProbPanel_Drawdown", OBJPROP_COLOR, drawdown_color);
+    
+    // Sharpe Ratio
+    string sharpe_text = "Sharpe Ratio: " + DoubleToString(g_daily_stats.sharpe_ratio, 2);
+    ObjectSetString(0, "ProbPanel_Sharpe", OBJPROP_TEXT, sharpe_text);
+    
+    // Volatilidade
+    string volatility_text = "Volatilidade: " + FormatPercentage(g_daily_stats.volatility);
+    ObjectSetString(0, "ProbPanel_Volatility", OBJPROP_TEXT, volatility_text);
+}
+
+/**
+ * Atualiza seção de notificações
+ */
+void UpdateNotificationsSection()
+{
+    // Telegram
+    string telegram_text = "Telegram: ";
+    if(g_telegram_initialized && g_config.notifications.enable_telegram)
+    {
+        telegram_text += "Ativo (" + IntegerToString(g_telegram_messages_success) + " enviadas)";
+    }
+    else
+    {
+        telegram_text += "Desabilitado";
+    }
+    ObjectSetString(0, "ProbPanel_Telegram", OBJPROP_TEXT, telegram_text);
+    
+    // MX2
+    string mx2_text = "MX2: ";
+    if(g_mx2_initialized && g_config.notifications.enable_mx2)
+    {
+        mx2_text += "Ativo (" + BrokerMX2ToString(g_config.notifications.mx2_broker) + ")";
+    }
+    else
+    {
+        mx2_text += "Desabilitado";
+    }
+    ObjectSetString(0, "ProbPanel_MX2", OBJPROP_TEXT, mx2_text);
+}
+
+/**
+ * Limpa objetos do painel
+ */
+void CleanupPanelObjects()
+{
+    for(int i = 0; i < g_panel_object_count; i++)
+    {
+        if(g_panel_objects[i] != "")
         {
-            ObjectSetInteger(0, full_name, OBJPROP_COLOR, text_color);
+            ObjectDelete(0, g_panel_objects[i]);
         }
     }
-}
-
-/**
- * Remove todos os objetos do painel
- */
-void RemoveAllPanelObjects()
-{
-    int total_objects = ObjectsTotal(0, -1, -1);
     
-    for(int i = total_objects - 1; i >= 0; i--)
-    {
-        string obj_name = ObjectName(0, i, -1, -1);
-        
-        if(StringFind(obj_name, g_panel_prefix) == 0)
-        {
-            ObjectDelete(0, obj_name);
-        }
-    }
-}
-
-/**
- * Força redesenho do painel
- */
-void RedrawPanel()
-{
-    if(!g_panel_initialized || !g_panel_config.enabled)
-    {
-        return;
-    }
-    
-    RemoveAllPanelObjects();
-    CreatePanelElements();
-    UpdatePanelData();
-    
-    ChartRedraw(0);
-}
-
-/**
- * Verifica se painel está operacional
- * @return true se operacional
- */
-bool IsPanelOperational()
-{
-    return g_panel_initialized && g_panel_config.enabled;
+    g_panel_object_count = 0;
+    ArrayResize(g_panel_objects, 0);
 }
 
 #endif // VISUAL_PANEL_CORE_MQH
