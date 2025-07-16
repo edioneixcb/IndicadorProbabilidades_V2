@@ -1,0 +1,28 @@
+# MetaTrader 5 files
+*.ex5
+*.log
+*.set
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+Logs/
+*.log
+
+# Cache
+cache/
+temp/
+
