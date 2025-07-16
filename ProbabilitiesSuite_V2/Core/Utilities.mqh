@@ -2,7 +2,7 @@
 //|                                    Core/Utilities.mqh |
 //|                        Copyright 2024, Quant Genius (Refactoring) |
 //|                                      https://www.google.com |
-//|                                    VERSÃO CORRIGIDA v2.0        |
+//|                                    VERSÃO SIMPLIFICADA v2.0     |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2024, Quant Genius (Refactoring)"
 #property link      "https://www.google.com"
@@ -11,354 +11,63 @@
 #define CORE_UTILITIES_MQH
 
 #include "Defines.mqh"
-#include "Globals.mqh"
 
 // ==================================================================
-// FUNÇÕES UTILITÁRIAS CORRIGIDAS - VERSÃO 2.0
+// FUNÇÕES UTILITÁRIAS SIMPLIFICADAS
 // ==================================================================
 
 //+------------------------------------------------------------------+
-//| CORREÇÃO #1: Função de validação segura para acesso ao cache    |
+//| Valida acesso seguro a array                                    |
 //+------------------------------------------------------------------+
-bool ValidateShiftAccess(int shift, int additional_history = 0, const string function_name = "")
+bool ValidateArrayAccess(int index, int array_size, string context = "")
 {
-    // Verificação de inicialização do cache
-    if(!g_cache_initialized) 
+    if(index < 0 || index >= array_size)
     {
-        if(function_name != "") 
-            Print("ERRO [", function_name, "]: Cache não inicializado");
-        RegisterSystemError("Cache não inicializado em " + function_name);
+        if(context != "")
+            Print("ERRO: Acesso inválido ao array em ", context, " - Index: ", index, ", Size: ", array_size);
         return false;
     }
-    
-    // Verificação de shift negativo
-    if(shift < 0) 
-    {
-        if(function_name != "") 
-            Print("ERRO [", function_name, "]: Shift negativo (", shift, ")");
-        RegisterSystemError("Shift negativo em " + function_name);
-        return false;
-    }
-    
-    // Verificação de limites superiores
-    int required_size = shift + additional_history;
-    if(required_size >= g_cache_size) 
-    {
-        if(function_name != "") 
-            Print("ERRO [", function_name, "]: Acesso fora dos limites (", 
-                  required_size, " >= ", g_cache_size, ")");
-        RegisterSystemError("Acesso fora dos limites em " + function_name);
-        return false;
-    }
-    
     return true;
 }
 
 //+------------------------------------------------------------------+
-//| CORREÇÃO #2: Versão segura de GetVisualCandleColor              |
-//+------------------------------------------------------------------+
-int GetVisualCandleColorSafe(int shift, const string caller = "")
-{
-    if(!ValidateShiftAccess(shift, 0, caller))
-        return VISUAL_DOJI; // Valor seguro padrão
-    
-    if(shift >= ArraySize(g_cache_candle_colors))
-        return VISUAL_DOJI;
-    
-    return g_cache_candle_colors[shift];
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #3: Função para calcular coordenadas consistentes      |
-//+------------------------------------------------------------------+
-SignalCoordinate CalculateSignalCoordinate(
-    int detection_shift, 
-    int direction, 
-    ENUM_POSICAO_SETA position_type
-)
-{
-    SignalCoordinate coord;
-    coord.detection_shift = detection_shift;
-    coord.is_valid = false;
-    coord.debug_info = "";
-    
-    // Determina shift de plotagem baseado na configuração
-    switch(position_type)
-    {
-        case POS_VELA_DE_SINAL:
-            coord.plot_shift = detection_shift + 1; // Vela do padrão
-            coord.debug_info = "Posição: Vela de Sinal";
-            break;
-        case POS_VELA_DE_ENTRADA:
-        default:
-            coord.plot_shift = detection_shift; // Vela de entrada
-            coord.debug_info = "Posição: Vela de Entrada";
-            break;
-    }
-    
-    // Validação de limites para plotagem
-    int total_bars = Bars(_Symbol, _Period);
-    if(coord.plot_shift >= total_bars || coord.plot_shift < 0)
-    {
-        Print("AVISO: Shift de plotagem inválido (", coord.plot_shift, 
-              "), usando shift de detecção");
-        coord.plot_shift = detection_shift;
-        coord.debug_info += " | Ajustado para shift de detecção";
-    }
-    
-    // Validação final
-    if(coord.plot_shift >= total_bars || coord.plot_shift < 0)
-    {
-        Print("ERRO: Impossível calcular coordenadas válidas");
-        coord.debug_info += " | ERRO: Coordenadas inválidas";
-        return coord; // is_valid permanece false
-    }
-    
-    // Cálculo de tempo e preço
-    coord.plot_time = iTime(_Symbol, _Period, coord.plot_shift);
-    
-    double point_value = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
-    if(point_value == 0) point_value = _Point;
-    
-    if(direction > 0) // CALL
-    {
-        coord.plot_price = iLow(_Symbol, _Period, coord.plot_shift) - (point_value * 10);
-        coord.debug_info += " | CALL";
-    }
-    else // PUT
-    {
-        coord.plot_price = iHigh(_Symbol, _Period, coord.plot_shift) + (point_value * 10);
-        coord.debug_info += " | PUT";
-    }
-    
-    // Validação final do preço
-    if(coord.plot_price <= 0)
-    {
-        Print("ERRO: Preço de plotagem inválido: ", coord.plot_price);
-        coord.debug_info += " | ERRO: Preço inválido";
-        return coord;
-    }
-    
-    coord.is_valid = true;
-    return coord;
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #4: Função de validação de integridade de dados        |
-//+------------------------------------------------------------------+
-bool ValidateDataIntegrity(const double &array[], int expected_size, string array_name = "")
-{
-    if(ArraySize(array) != expected_size)
-    {
-        Print("ERRO: Tamanho inconsistente em ", array_name, 
-              " - Esperado: ", expected_size, ", Atual: ", ArraySize(array));
-        return false;
-    }
-    
-    // Verifica valores inválidos (NaN, infinito)
-    for(int i = 0; i < MathMin(expected_size, 100); i += 10) // Amostragem
-    {
-        if(!MathIsValidNumber(array[i]))
-        {
-            Print("ERRO: Valor inválido em ", array_name, "[", i, "]: ", array[i]);
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #5: Função de limpeza segura de objetos                |
-//+------------------------------------------------------------------+
-void LimpaObjetosPorPrefixo(string prefixo, int tipo_objeto = -1)
-{
-    int total_objetos = ObjectsTotal(0);
-    
-    for(int i = total_objetos - 1; i >= 0; i--)
-    {
-        string nome_objeto = ObjectName(0, i);
-        
-        if(StringFind(nome_objeto, prefixo) == 0)
-        {
-            if(tipo_objeto == -1 || ObjectGetInteger(0, nome_objeto, OBJPROP_TYPE) == tipo_objeto)
-            {
-                if(!ObjectDelete(0, nome_objeto))
-                {
-                    Print("AVISO: Falha ao deletar objeto: ", nome_objeto);
-                }
-            }
-        }
-    }
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #6: Função de conversão segura de string para double   |
-//+------------------------------------------------------------------+
-double SafeStringToDouble(string str, double default_value = 0.0)
-{
-    if(str == "" || str == NULL)
-        return default_value;
-    
-    double result = StringToDouble(str);
-    
-    if(!MathIsValidNumber(result))
-        return default_value;
-    
-    return result;
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #7: Função de conversão segura de string para int      |
-//+------------------------------------------------------------------+
-int SafeStringToInteger(string str, int default_value = 0)
-{
-    if(str == "" || str == NULL)
-        return default_value;
-    
-    int result = (int)StringToInteger(str);
-    return result;
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #8: Função de formatação segura de double              |
-//+------------------------------------------------------------------+
-string SafeDoubleToString(double value, int digits = 2)
-{
-    if(!MathIsValidNumber(value))
-        return "N/A";
-    
-    return DoubleToString(value, digits);
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #9: Função de validação de handle de indicador         |
-//+------------------------------------------------------------------+
-bool IsValidIndicatorHandle(int handle)
-{
-    return (handle != INVALID_HANDLE && handle > 0);
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #10: Função de cópia segura de dados de indicador      |
-//+------------------------------------------------------------------+
-bool SafeCopyBuffer(int handle, int buffer_index, int start, int count, double &array[])
-{
-    if(!IsValidIndicatorHandle(handle))
-    {
-        Print("ERRO: Handle de indicador inválido");
-        return false;
-    }
-    
-    if(count <= 0 || start < 0)
-    {
-        Print("ERRO: Parâmetros de cópia inválidos - Start: ", start, ", Count: ", count);
-        return false;
-    }
-    
-    int copied = CopyBuffer(handle, buffer_index, start, count, array);
-    
-    if(copied != count)
-    {
-        Print("AVISO: Cópia incompleta - Solicitado: ", count, ", Copiado: ", copied);
-        return false;
-    }
-    
-    return true;
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #11: Função de validação de símbolo e timeframe        |
-//+------------------------------------------------------------------+
-bool ValidateSymbolAndTimeframe(string symbol, ENUM_TIMEFRAMES timeframe)
-{
-    if(symbol == "" || symbol == NULL)
-    {
-        Print("ERRO: Símbolo inválido");
-        return false;
-    }
-    
-    if(!SymbolSelect(symbol, true))
-    {
-        Print("ERRO: Símbolo não disponível: ", symbol);
-        return false;
-    }
-    
-    if(timeframe == PERIOD_CURRENT)
-        timeframe = _Period;
-    
-    if(timeframe < PERIOD_M1 || timeframe > PERIOD_MN1)
-    {
-        Print("ERRO: Timeframe inválido: ", EnumToString(timeframe));
-        return false;
-    }
-    
-    return true;
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #12: Função de cálculo de hash simples                 |
-//+------------------------------------------------------------------+
-string CalculateSimpleHash(const int &array[], int sample_size = 100)
-{
-    if(ArraySize(array) == 0)
-        return "";
-    
-    int hash = 0;
-    int size = ArraySize(array);
-    int step = MathMax(1, size / sample_size);
-    
-    for(int i = 0; i < size; i += step)
-    {
-        hash += array[i] * (i + 1);
-    }
-    
-    return IntegerToString(hash) + "_" + IntegerToString(size);
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #13: Função de validação de período de tempo           |
-//+------------------------------------------------------------------+
-bool IsValidTimePeriod(datetime start_time, datetime end_time)
-{
-    if(start_time <= 0 || end_time <= 0)
-        return false;
-    
-    if(start_time >= end_time)
-        return false;
-    
-    // Verifica se não é muito no futuro (mais de 1 ano)
-    if(end_time > TimeCurrent() + 365 * 24 * 3600)
-        return false;
-    
-    return true;
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #14: Função de formatação de tempo para logs           |
-//+------------------------------------------------------------------+
-string FormatTimeForLog(datetime time)
-{
-    if(time <= 0)
-        return "INVALID_TIME";
-    
-    return TimeToString(time, TIME_DATE | TIME_SECONDS);
-}
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #15: Função de validação de parâmetros de entrada      |
+//| Valida parâmetro de entrada                                     |
 //+------------------------------------------------------------------+
 bool ValidateInputParameter(double value, double min_val, double max_val, string param_name)
 {
-    if(!MathIsValidNumber(value))
-    {
-        Print("ERRO: Parâmetro ", param_name, " contém valor inválido: ", value);
-        return false;
-    }
-    
     if(value < min_val || value > max_val)
     {
-        Print("ERRO: Parâmetro ", param_name, " fora do intervalo [", min_val, ", ", max_val, "]: ", value);
+        Print("ERRO: Parâmetro ", param_name, " fora do range [", min_val, ", ", max_val, "] - Valor: ", value);
+        return false;
+    }
+    return true;
+}
+
+//+------------------------------------------------------------------+
+//| Valida handle de indicador                                      |
+//+------------------------------------------------------------------+
+bool ValidateIndicatorHandle(int handle, string indicator_name)
+{
+    if(handle == INVALID_HANDLE)
+    {
+        Print("ERRO: Handle inválido para ", indicator_name, " - Erro: ", GetLastError());
+        return false;
+    }
+    return true;
+}
+
+//+------------------------------------------------------------------+
+//| Copia buffer de indicador com validação                         |
+//+------------------------------------------------------------------+
+bool SafeCopyBuffer(int handle, int buffer_num, int start_pos, int count, double &array[])
+{
+    if(handle == INVALID_HANDLE)
+        return false;
+    
+    int copied = CopyBuffer(handle, buffer_num, start_pos, count, array);
+    if(copied <= 0)
+    {
+        Print("ERRO: Falha ao copiar buffer - Handle: ", handle, ", Buffer: ", buffer_num, ", Erro: ", GetLastError());
         return false;
     }
     
@@ -366,203 +75,217 @@ bool ValidateInputParameter(double value, double min_val, double max_val, string
 }
 
 //+------------------------------------------------------------------+
-//| CORREÇÃO #16: Função de backup de configuração                  |
+//| Calcula tamanho do corpo da vela                                |
 //+------------------------------------------------------------------+
-bool BackupConfiguration(string backup_name = "")
+double GetCandleBodySize(double open, double close)
 {
-    if(backup_name == "")
-        backup_name = "config_backup_" + TimeToString(TimeCurrent(), TIME_DATE);
-    
-    // Esta função seria expandida para salvar configurações em arquivo
-    // Por simplicidade, apenas registra a tentativa
-    Print("Backup de configuração solicitado: ", backup_name);
-    return true;
+    return MathAbs(close - open);
 }
 
 //+------------------------------------------------------------------+
-//| CORREÇÃO #17: Função de restauração de configuração             |
+//| Calcula tamanho da sombra superior                              |
 //+------------------------------------------------------------------+
-bool RestoreConfiguration(string backup_name)
+double GetUpperShadowSize(double open, double close, double high)
 {
-    if(backup_name == "")
-    {
-        Print("ERRO: Nome de backup não especificado");
-        return false;
-    }
-    
-    // Esta função seria expandida para carregar configurações de arquivo
-    // Por simplicidade, apenas registra a tentativa
-    Print("Restauração de configuração solicitada: ", backup_name);
-    return true;
+    return high - MathMax(open, close);
 }
 
 //+------------------------------------------------------------------+
-//| CORREÇÃO #18: Função de medição de performance                  |
+//| Calcula tamanho da sombra inferior                              |
 //+------------------------------------------------------------------+
-class PerformanceMeasurer
+double GetLowerShadowSize(double open, double close, double low)
 {
-private:
-    ulong start_time;
-    string operation_name;
-    
-public:
-    PerformanceMeasurer(string name)
-    {
-        operation_name = name;
-        start_time = GetTickCount64();
-    }
-    
-    ~PerformanceMeasurer()
-    {
-        ulong elapsed = GetTickCount64() - start_time;
-        RegisterCalculationTime(elapsed);
-        
-        if(elapsed > 1000) // Log se demorar mais de 1 segundo
-        {
-            Print("PERFORMANCE: ", operation_name, " executado em ", elapsed, "ms");
-        }
-    }
-    
-    ulong GetElapsedTime()
-    {
-        return GetTickCount64() - start_time;
-    }
-};
-
-//+------------------------------------------------------------------+
-//| CORREÇÃO #19: Função de validação de array                      |
-//+------------------------------------------------------------------+
-bool ValidateArray(const double &array[], int min_size = 1, string array_name = "")
-{
-    int size = ArraySize(array);
-    
-    if(size < min_size)
-    {
-        Print("ERRO: Array ", array_name, " muito pequeno - Tamanho: ", size, ", Mínimo: ", min_size);
-        return false;
-    }
-    
-    // Verifica alguns valores para detectar corrupção
-    int check_count = MathMin(size, 10);
-    for(int i = 0; i < check_count; i++)
-    {
-        if(!MathIsValidNumber(array[i]))
-        {
-            Print("ERRO: Valor inválido em ", array_name, "[", i, "]: ", array[i]);
-            return false;
-        }
-    }
-    
-    return true;
+    return MathMin(open, close) - low;
 }
 
 //+------------------------------------------------------------------+
-//| CORREÇÃO #20: Função de normalização de valores                 |
+//| Verifica se vela é de alta                                      |
 //+------------------------------------------------------------------+
-double NormalizeValue(double value, double min_val, double max_val)
+bool IsBullishCandle(double open, double close)
 {
-    if(!MathIsValidNumber(value) || !MathIsValidNumber(min_val) || !MathIsValidNumber(max_val))
-        return 0.0;
-    
-    if(max_val <= min_val)
-        return 0.0;
-    
-    if(value <= min_val)
-        return 0.0;
-    
-    if(value >= max_val)
-        return 1.0;
-    
-    return (value - min_val) / (max_val - min_val);
+    return close > open;
 }
 
 //+------------------------------------------------------------------+
-//| CORREÇÃO #21: Função de verificação de recursos do sistema      |
+//| Verifica se vela é de baixa                                     |
 //+------------------------------------------------------------------+
-bool CheckSystemResources()
+bool IsBearishCandle(double open, double close)
 {
-    // Verifica memória disponível (estimativa)
-    int estimated_memory = g_system_metrics.memory_usage_kb;
+    return close < open;
+}
+
+//+------------------------------------------------------------------+
+//| Calcula range total da vela                                     |
+//+------------------------------------------------------------------+
+double GetCandleRange(double high, double low)
+{
+    return high - low;
+}
+
+//+------------------------------------------------------------------+
+//| Verifica se é uma vela doji                                     |
+//+------------------------------------------------------------------+
+bool IsDojiCandle(double open, double close, double high, double low, double threshold = 0.1)
+{
+    double body = GetCandleBodySize(open, close);
+    double range = GetCandleRange(high, low);
     
-    if(estimated_memory > 50000) // 50MB
-    {
-        Print("AVISO: Alto uso de memória detectado: ", estimated_memory, " KB");
-        RegisterSystemWarning();
-        return false;
-    }
+    if(range == 0) return false;
     
-    // Verifica se há muitos objetos no gráfico
+    return (body / range) < threshold;
+}
+
+//+------------------------------------------------------------------+
+//| Limpa objetos por prefixo                                       |
+//+------------------------------------------------------------------+
+void CleanObjectsByPrefix(string prefix)
+{
     int total_objects = ObjectsTotal(0);
-    if(total_objects > 1000)
+    
+    for(int i = total_objects - 1; i >= 0; i--)
     {
-        Print("AVISO: Muitos objetos no gráfico: ", total_objects);
-        RegisterSystemWarning();
-        return false;
+        string obj_name = ObjectName(0, i);
+        if(StringFind(obj_name, prefix) >= 0)
+        {
+            ObjectDelete(0, obj_name);
+        }
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Converte timeframe para string                                  |
+//+------------------------------------------------------------------+
+string TimeframeToString(ENUM_TIMEFRAMES timeframe)
+{
+    switch(timeframe)
+    {
+        case PERIOD_M1:  return "M1";
+        case PERIOD_M5:  return "M5";
+        case PERIOD_M15: return "M15";
+        case PERIOD_M30: return "M30";
+        case PERIOD_H1:  return "H1";
+        case PERIOD_H4:  return "H4";
+        case PERIOD_D1:  return "D1";
+        case PERIOD_W1:  return "W1";
+        case PERIOD_MN1: return "MN1";
+        default:         return "UNKNOWN";
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Formata preço para exibição                                     |
+//+------------------------------------------------------------------+
+string FormatPrice(double price)
+{
+    return DoubleToString(price, _Digits);
+}
+
+//+------------------------------------------------------------------+
+//| Formata tempo para exibição                                     |
+//+------------------------------------------------------------------+
+string FormatTime(datetime time, bool include_seconds = false)
+{
+    if(include_seconds)
+        return TimeToString(time, TIME_DATE|TIME_SECONDS);
+    else
+        return TimeToString(time, TIME_DATE|TIME_MINUTES);
+}
+
+//+------------------------------------------------------------------+
+//| Calcula distância em pontos                                     |
+//+------------------------------------------------------------------+
+double PointsDistance(double price1, double price2)
+{
+    return MathAbs(price1 - price2) / _Point;
+}
+
+//+------------------------------------------------------------------+
+//| Verifica se preço está dentro do range                          |
+//+------------------------------------------------------------------+
+bool IsPriceInRange(double price, double min_price, double max_price)
+{
+    return (price >= min_price && price <= max_price);
+}
+
+//+------------------------------------------------------------------+
+//| Calcula média de array                                          |
+//+------------------------------------------------------------------+
+double CalculateArrayAverage(const double &array[], int start = 0, int count = -1)
+{
+    int array_size = ArraySize(array);
+    if(array_size == 0) return 0.0;
+    
+    if(count == -1) count = array_size - start;
+    if(start + count > array_size) count = array_size - start;
+    
+    double sum = 0.0;
+    for(int i = start; i < start + count; i++)
+    {
+        sum += array[i];
     }
     
-    return true;
+    return sum / count;
 }
 
 //+------------------------------------------------------------------+
-//| CORREÇÃO #22: Função de limpeza de emergência                   |
+//| Encontra valor máximo em array                                  |
 //+------------------------------------------------------------------+
-void EmergencyCleanup()
+double FindArrayMaximum(const double &array[], int start = 0, int count = -1)
 {
-    Print("EXECUTANDO LIMPEZA DE EMERGÊNCIA...");
+    int array_size = ArraySize(array);
+    if(array_size == 0) return 0.0;
     
-    // Limpa objetos visuais
-    LimpaObjetosPorPrefixo(painelPrefix);
-    LimpaObjetosPorPrefixo(arrowPrefix);
-    LimpaObjetosPorPrefixo(timerPrefix);
-    LimpaObjetosPorPrefixo(resultPrefix);
-    LimpaObjetosPorPrefixo(buttonPrefix);
+    if(count == -1) count = array_size - start;
+    if(start + count > array_size) count = array_size - start;
     
-    // Reset de contadores de erro
-    ResetConsecutiveErrors();
+    double max_value = array[start];
+    for(int i = start + 1; i < start + count; i++)
+    {
+        if(array[i] > max_value)
+            max_value = array[i];
+    }
     
-    // Força garbage collection (se disponível)
-    // Em MQL5, isso é feito automaticamente
-    
-    Print("Limpeza de emergência concluída");
+    return max_value;
 }
 
 //+------------------------------------------------------------------+
-//| CORREÇÃO #23: Função de diagnóstico do sistema                  |
+//| Encontra valor mínimo em array                                  |
 //+------------------------------------------------------------------+
-void SystemDiagnostic()
+double FindArrayMinimum(const double &array[], int start = 0, int count = -1)
 {
-    Print("=== DIAGNÓSTICO DO SISTEMA ===");
+    int array_size = ArraySize(array);
+    if(array_size == 0) return 0.0;
     
-    // Estado do cache
-    Print("Cache: ", g_cache_initialized ? "OK" : "FALHA", 
-          " (", g_cache_size, " velas)");
+    if(count == -1) count = array_size - start;
+    if(start + count > array_size) count = array_size - start;
     
-    // Estado da SuperVarredura
-    Print("SuperVarredura: ", g_rodouSuperVarreduraComSucesso ? "OK" : "PENDENTE");
+    double min_value = array[start];
+    for(int i = start + 1; i < start + count; i++)
+    {
+        if(array[i] < min_value)
+            min_value = array[i];
+    }
     
-    // Métricas de performance
-    SystemMetrics metrics = GetCurrentSystemMetrics();
-    Print("Uptime: ", metrics.uptime_seconds, "s");
-    Print("Sinais gerados: ", metrics.total_signals_generated);
-    Print("Erros: ", metrics.errors_count);
-    Print("Warnings: ", metrics.warnings_count);
-    Print("Tempo médio de cálculo: ", SafeDoubleToString(metrics.avg_calculation_time_ms, 2), "ms");
-    Print("Uso de memória: ", metrics.memory_usage_kb, " KB");
-    
-    // Estado de handles
-    Print("ATR Handle: ", IsValidIndicatorHandle(g_atr_handle) ? "OK" : "INVÁLIDO");
-    Print("BB Handle: ", IsValidIndicatorHandle(g_bb_handle) ? "OK" : "INVÁLIDO");
-    Print("MA Handle: ", IsValidIndicatorHandle(g_ma_handle) ? "OK" : "INVÁLIDO");
-    
-    Print("=== FIM DO DIAGNÓSTICO ===");
+    return min_value;
 }
 
 //+------------------------------------------------------------------+
-//| Função de inicialização de utilitários                          |
+//| Função de log simplificada                                      |
 //+------------------------------------------------------------------+
-void InitializeUtilities()
+void SimpleLog(int level, string context, string message)
 {
-    Print("Utilitários do sistema inicializados");
+    string level_str = "";
+    switch(level)
+    {
+        case LOG_DEBUG:    level_str = "DEBUG"; break;
+        case LOG_INFO:     level_str = "INFO"; break;
+        case LOG_WARNING:  level_str = "WARNING"; break;
+        case LOG_ERROR:    level_str = "ERROR"; break;
+        case LOG_CRITICAL: level_str = "CRITICAL"; break;
+        default:           level_str = "UNKNOWN"; break;
+    }
+    
+    Print("[", level_str, "] ", context, ": ", message);
 }
 
 #endif // CORE_UTILITIES_MQH
